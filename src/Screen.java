@@ -3,6 +3,9 @@ package src;
 import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.List;
 
 public class Screen extends JFrame {
 
@@ -69,11 +72,7 @@ public class Screen extends JFrame {
         setJMenuBar(menuBar);
 
         menuItemConnect.addActionListener(e -> {
-            try {
-                NetworkManager.getInstance().connect();
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
+            NetworkManager.getInstance().connect();
         });
 
         menuItemDisconnect.addActionListener(e -> {
@@ -284,5 +283,9 @@ public class Screen extends JFrame {
         searchPanel.add(btnSearch, sgbc);
 
         foundPanel.add(searchPanel, BorderLayout.SOUTH);
+    }
+
+    public int getPeerInfo() throws UnknownHostException {
+        return Integer.parseInt(JOptionPane.showInputDialog("Enter the port number of the peer: "));
     }
 }

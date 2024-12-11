@@ -13,6 +13,10 @@ public class Peer {
         this.port = port;
         this.ownedChunks = new HashSet<>();
         this.peers = new HashSet<>();
+
+        if (port == 5004) {
+            ownedChunks.add("\\Users\\Okan\\OneDrive\\Belgeler\\CV\\okan_bulgur_cv_1.pdf");
+        }
     }
 
     public void addOwnedChunk(String chunk) {
