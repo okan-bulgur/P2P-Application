@@ -118,6 +118,44 @@ public class NetworkManager {
         }
     }
 
+    public void sendSearchRequest(String filename) throws IOException { // SEARCH_REQUEST:filename=x:ip=x.x.x.x:port=xxxx:ttl=x
+        String message = "SEARCH_REQUEST:" +
+                "filename=" + filename +
+                ":ip=" + InetAddress.getLocalHost().getHostAddress() +
+                ":port=" + udpSocket.getLocalPort() +
+                ":ttl=" + MAX_TTL + ":" +
+                "visited=" + InetAddress.getLocalHost().getHostAddress() + ":" + udpSocket.getLocalPort();
+
+        System.out.println("Send Request peer " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
+        byte[] data = message.getBytes();
+
+        if (peer.getPeers().isEmpty()) {
+            System.out.println("No peers to send search request to.");
+            /*
+            sendBootstrapRequest();
+
+            try {
+                Thread.sleep(2000); // Sleep for 2 seconds
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                System.out.println("Sleep interrupted");
+            }
+
+            sendSearchRequest(filename);
+            return;
+            */
+            return;
+        }
+
+        for(PeerDTO peer : peer.getPeers()) {
+
+            System.out.println("Sending search request to: " + peer.ip() + ":" + peer.port());
+            DatagramPacket packet = new DatagramPacket(data, data.length,
+                    InetAddress.getByName(peer.ip()), peer.port());
+            udpSocket.send(packet);
+        }
+    }
+
     private void sendFriendRequest(String ip, int port) throws IOException {
         String message = "FRIEND_REQUEST:" +
                 "ip=" + InetAddress.getLocalHost().getHostAddress() +
@@ -128,6 +166,22 @@ public class NetworkManager {
                 InetAddress.getByName(ip), port);
         udpSocket.send(packet);
         System.out.println("Friend request sent to: " + ip + ":" + port + " (" + message + ")");
+    }
+
+    private void sendFileNotification(String notif) throws IOException {
+        String message = "FILE_NOTIFICATION:" +
+                notif + // event=x:filename=x
+                ":ip=" + InetAddress.getLocalHost().getHostAddress() +
+                ":port=" + udpSocket.getLocalPort();
+
+        byte[] data = message.getBytes();
+
+        for(PeerDTO peer : peer.getPeers()) {
+            System.out.println("Sending file notification to: " + peer.ip() + ":" + peer.port() + " (" + message + ")");
+            DatagramPacket packet = new DatagramPacket(data, data.length,
+                    InetAddress.getByName(peer.ip()), peer.port());
+            broadcastSocket.send(packet);
+        }
     }
 
     private void spreadSearchRequest(String filename, String requesterIP, int requesterPort, int ttl, HashSet<PeerDTO> visited) throws IOException {
@@ -312,6 +366,24 @@ public class NetworkManager {
             PeerDTO newPeer = new PeerDTO(ip, port);
             peer.addPeer(newPeer);
         }
+
+        else if (message.startsWith("FILE_NOTIFICATION")) { // FILE_NOTIFICATION:event=x:filename=x:ip=x.x.x.x:port=xxxx
+            String[] parts = message.split(":");
+            String event = parts[1].split("=")[1];
+            String filename = parts[2].split("=")[1];
+            String ip = parts[3].split("=")[1];
+
+            int port = Integer.parseInt(parts[4].split("=")[1]);
+
+            if (event.equals("ENTRY_CREATE")) {
+                peer.addFileToPeer(filename, new PeerDTO(ip, port));
+            }
+            else if (event.equals("ENTRY_DELETE")) {
+                peer.removeFileToPeer(filename);
+            }
+
+            peer.addPeer(new PeerDTO(ip, port));
+        }
     }
 
     private void sendBootstrapRequest() throws IOException {
@@ -325,44 +397,6 @@ public class NetworkManager {
                 InetAddress.getByName(BROADCAST_IP), BROADCAST_PORT);
         broadcastSocket.send(packet);
         System.out.println("Bootstrap request sent to: " + BROADCAST_IP + ":" + BROADCAST_PORT + " (" + message + ")");
-    }
-
-    public void sendSearchRequest(String filename) throws IOException { // SEARCH_REQUEST:filename=x:ip=x.x.x.x:port=xxxx:ttl=x
-        String message = "SEARCH_REQUEST:" +
-                "filename=" + filename +
-                ":ip=" + InetAddress.getLocalHost().getHostAddress() +
-                ":port=" + udpSocket.getLocalPort() +
-                ":ttl=" + MAX_TTL + ":" +
-                "visited=" + InetAddress.getLocalHost().getHostAddress() + ":" + udpSocket.getLocalPort();
-
-        System.out.println("Send Request peer " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
-        byte[] data = message.getBytes();
-
-        if (peer.getPeers().isEmpty()) {
-            System.out.println("No peers to send search request to.");
-            /*
-            sendBootstrapRequest();
-
-            try {
-                Thread.sleep(2000); // Sleep for 2 seconds
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                System.out.println("Sleep interrupted");
-            }
-
-            sendSearchRequest(filename);
-            return;
-            */
-            return;
-        }
-
-        for(PeerDTO peer : peer.getPeers()) {
-
-            System.out.println("Sending search request to: " + peer.ip() + ":" + peer.port());
-            DatagramPacket packet = new DatagramPacket(data, data.length,
-                    InetAddress.getByName(peer.ip()), peer.port());
-            udpSocket.send(packet);
-        }
     }
 
     public void addManuelPeer(String ip, int port) {

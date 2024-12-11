@@ -2,6 +2,7 @@ package src;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -140,19 +141,14 @@ public class Screen extends JFrame {
 
         btnSetRoot.addActionListener(e -> {
             JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+            fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             fileChooser.setAcceptAllFileFilterUsed(false);
+
             if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
                 txtRootFolder.setText(fileChooser.getSelectedFile().getAbsolutePath());
-            }
-
-            try {
-                NetworkManager.getInstance().sendSearchRequest(fileChooser.getSelectedFile().getAbsolutePath().split(":")[1]);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
+                FileManager.getInstance().setRootFolder(fileChooser.getSelectedFile());
             }
         });
-
     }
 
     private void setupDestinationFolderPanel(){
@@ -172,6 +168,17 @@ public class Screen extends JFrame {
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 3; gbc.weightx = 1.0; gbc.weighty = 0.0; gbc.fill = GridBagConstraints.HORIZONTAL;
 
         mainPanel.add(destFolderPanel, gbc);
+
+        btnSetDestination.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fileChooser.setAcceptAllFileFilterUsed(false);
+
+            if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                txtDestinationFolder.setText(fileChooser.getSelectedFile().getAbsolutePath());
+                FileManager.getInstance().setDestinationFolder(fileChooser.getSelectedFile());
+            }
+        });
     }
 
     private void setupSettingsPanel(){
@@ -283,6 +290,17 @@ public class Screen extends JFrame {
         searchPanel.add(btnSearch, sgbc);
 
         foundPanel.add(searchPanel, BorderLayout.SOUTH);
+
+        btnSearch.addActionListener(e -> {
+            String search = txtSearch.getText();
+            if (search.isEmpty()) return;
+
+            try {
+                NetworkManager.getInstance().sendSearchRequest(search);
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
     }
 
     public int getPeerInfo() throws UnknownHostException {

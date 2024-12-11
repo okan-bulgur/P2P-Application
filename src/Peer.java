@@ -1,5 +1,6 @@
 package src;
 
+import java.util.HashMap;
 import java.util.HashSet;
 
 public class Peer {
@@ -7,12 +8,14 @@ public class Peer {
     private final int port;
     private HashSet<String> ownedChunks;
     private HashSet<PeerDTO> peers;
+    private HashMap<String, PeerDTO> fileToPeer;
 
     public Peer(String ip, int port) {
         this.ip = ip;
         this.port = port;
         this.ownedChunks = new HashSet<>();
         this.peers = new HashSet<>();
+        this.fileToPeer = new HashMap<>();
 
         if (port == 5004) {
             ownedChunks.add("\\Users\\Okan\\OneDrive\\Belgeler\\CV\\okan_bulgur_cv_1.pdf");
@@ -43,6 +46,14 @@ public class Peer {
         return peers.contains(peer);
     }
 
+    public void addFileToPeer(String file, PeerDTO peer) {
+        fileToPeer.put(file, peer);
+    }
+
+    public void removeFileToPeer(String file) {
+        fileToPeer.remove(file);
+    }
+
     public String getIp() {
         return ip;
     }
@@ -57,6 +68,10 @@ public class Peer {
 
     public HashSet<PeerDTO> getPeers() {
         return peers;
+    }
+
+    public HashMap<String, PeerDTO> getFileToPeer() {
+        return fileToPeer;
     }
 
     public String toString() {
