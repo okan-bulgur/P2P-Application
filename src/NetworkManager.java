@@ -24,22 +24,22 @@ public class NetworkManager {
     final String BROADCAST_IP = "255.255.255.255";
     final int BROADCAST_PORT = 5050;
 
-    public static synchronized NetworkManager getInstance(Peer peer) {
+    protected static synchronized NetworkManager getInstance(Peer peer) {
         if (instance == null) {
             instance = new NetworkManager(peer);
         }
         return instance;
     }
 
-    public static synchronized NetworkManager getInstance() {
+    protected static synchronized NetworkManager getInstance() {
         return getInstance(new Peer("localhost", 8080));
     }
 
-    public NetworkManager(Peer peer) {
+    protected NetworkManager(Peer peer) {
         this.peer = peer;
     }
 
-    public void connect() {
+    protected void connect() {
 
         if (isConnected) {
             return;
@@ -78,7 +78,7 @@ public class NetworkManager {
         }
     }
 
-    public void disconnect() {
+    protected void disconnect() {
         if (!isConnected) {
             return;
         }
@@ -168,7 +168,7 @@ public class NetworkManager {
         System.out.println("Friend request sent to: " + ip + ":" + port + " (" + message + ")");
     }
 
-    private void sendFileNotification(String notif) throws IOException {
+    protected void sendFileNotification(String notif) throws IOException {
         String message = "FILE_NOTIFICATION:" +
                 notif + // event=x:filename=x
                 ":ip=" + InetAddress.getLocalHost().getHostAddress() +
@@ -176,12 +176,11 @@ public class NetworkManager {
 
         byte[] data = message.getBytes();
 
-        for(PeerDTO peer : peer.getPeers()) {
-            System.out.println("Sending file notification to: " + peer.ip() + ":" + peer.port() + " (" + message + ")");
-            DatagramPacket packet = new DatagramPacket(data, data.length,
-                    InetAddress.getByName(peer.ip()), peer.port());
-            broadcastSocket.send(packet);
-        }
+        System.out.println("Sending file notification: (" + message + ")");
+
+        DatagramPacket packet = new DatagramPacket(data, data.length,
+                InetAddress.getByName(BROADCAST_IP), BROADCAST_PORT);
+        broadcastSocket.send(packet);
     }
 
     private void spreadSearchRequest(String filename, String requesterIP, int requesterPort, int ttl, HashSet<PeerDTO> visited) throws IOException {
@@ -313,13 +312,6 @@ public class NetworkManager {
             try {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 broadcastSocket.receive(packet);
-
-                if (packet.getAddress().getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())) {
-                    continue;
-                }
-
-                System.out.println("Received packet from: " + packet.getAddress() + ":" + packet.getPort() + " (BROADCAST) " + "Message: " + new String(packet.getData(), 0, packet.getLength()) + "\n");
-
                 processBroadcastResponse(packet);
             } catch (IOException e) {
                 if(!isBroadcastConnected) break;
@@ -330,39 +322,23 @@ public class NetworkManager {
     private void processBroadcastResponse(DatagramPacket packet) throws IOException {
         String message = new String(packet.getData(), 0, packet.getLength()).trim();
 
-        if (message.equals("BOOTSTRAP_REQUEST")) { // BOOTSTRAP_REQUEST:ip=x.x.x.x:port=xxxx
+        System.out.println("Received broadcast packet from: " + packet.getAddress() + ":" + packet.getPort() + " (" + message + ")\n");
+
+        if (message.startsWith("BOOTSTRAP_REQUEST")) { // BOOTSTRAP_REQUEST:ip=x.x.x.x:port=xxxx
+            System.out.println("HEREEEEE");
             String[] parts = message.split(":");
             String[] peerInfo = parts[1].split("=");
             String ip = peerInfo[1].split(":")[0];
             int port = Integer.parseInt(parts[2].split("=")[1]);
+
+            System.out.println("***** Received bootstrap request from: " + ip + ":" + port);
 
             if (InetAddress.getByName(peer.getIp()).getHostAddress().equals(ip) && peer.getPort() == port) {
                 return;
             }
 
-            String responseMessage = "BOOTSTRAP_RESPONSE:ip=" +
-                    InetAddress.getLocalHost().getHostAddress() +
-                    ":port=" + udpSocket.getLocalPort();
-
-            byte[] responseData = responseMessage.getBytes();
-            DatagramPacket responsePacket = new DatagramPacket(
-                    responseData, responseData.length,
-                    packet.getAddress(), packet.getPort()
-            );
-
-            broadcastSocket.send(responsePacket);
-            System.out.println("Sent response to: " + packet.getAddress() + ":" + packet.getPort() + " " + responseMessage);
-
-            PeerDTO newPeer = new PeerDTO(ip, port);
-            peer.addPeer(newPeer);
-        }
-
-        else if (message.startsWith("BOOTSTRAP_RESPONSE")) { // BOOTSTRAP_RESPONSE:peer_ip=x.x.x.x:peer_port=xxxx
-            String[] parts = message.split(":");
-            String[] peerInfo = parts[1].split("=");
-            String ip = peerInfo[1].split(":")[0];
-            int port = Integer.parseInt(parts[2].split("=")[1]);
-
+            System.out.println("(BROADCAST) Added peer: " + ip + ":" + port);
+            sendFriendRequest(ip, port);
             PeerDTO newPeer = new PeerDTO(ip, port);
             peer.addPeer(newPeer);
         }
@@ -372,8 +348,11 @@ public class NetworkManager {
             String event = parts[1].split("=")[1];
             String filename = parts[2].split("=")[1];
             String ip = parts[3].split("=")[1];
-
             int port = Integer.parseInt(parts[4].split("=")[1]);
+
+            if (InetAddress.getByName(peer.getIp()).getHostAddress().equals(ip) && peer.getPort() == port) {
+                return;
+            }
 
             if (event.equals("ENTRY_CREATE")) {
                 peer.addFileToPeer(filename, new PeerDTO(ip, port));
@@ -399,14 +378,14 @@ public class NetworkManager {
         System.out.println("Bootstrap request sent to: " + BROADCAST_IP + ":" + BROADCAST_PORT + " (" + message + ")");
     }
 
-    public void addManuelPeer(String ip, int port) {
+    protected void addManuelPeer(String ip, int port) {
         PeerDTO newPeer = new PeerDTO(ip, port);
         peer.addPeer(newPeer);
 
         System.out.println("Peer added: " + newPeer.ip() + ":" + newPeer.port());
     }
 
-    public void showPeers() {
+    protected void showPeers() {
         System.out.println("\n\nPeers of " + peer);
         for (PeerDTO p : peer.getPeers()) {
             System.out.println(p);

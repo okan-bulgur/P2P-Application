@@ -25,6 +25,15 @@ public class FileManager {
 
     public void setRootFolder(File root) {
         this.rootFolder = root;
+
+        for (File file : listSharedFiles()) {
+            try {
+                NetworkManager.getInstance().sendFileNotification("event=ENTRY_CREATE:filename=" + file.getName());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        
         new Thread(this::watchSharedFolder).start();
     }
 
@@ -75,6 +84,11 @@ public class FileManager {
                 key.pollEvents().forEach(event -> {
                     String message = String.format("event=%s:filename=%s", event.kind(), event.context());
                     System.out.println(message);
+                    try {
+                        NetworkManager.getInstance().sendFileNotification(message);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 });
 
                 boolean valid = key.reset();
