@@ -1,4 +1,4 @@
-package src;
+package src.DTO;
 
 public record PeerDTO(String ip, int port) {
 

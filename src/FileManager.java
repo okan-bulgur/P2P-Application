@@ -1,17 +1,20 @@
 package src;
 
+import src.DTO.PeerDTO;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardWatchEventKinds;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
+import java.nio.file.*;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 public class FileManager {
+    final int CHUNK_SIZE = 256 * 1024;
+
     private static FileManager instance;
     private File rootFolder;
     private File destinationFolder;
@@ -23,37 +26,11 @@ public class FileManager {
         return instance;
     }
 
-    public void setRootFolder(File root) {
-        this.rootFolder = root;
-
-        for (File file : listSharedFiles()) {
-            try {
-                NetworkManager.getInstance().sendFileNotification("event=ENTRY_CREATE:filename=" + file.getName());
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        
-        new Thread(this::watchSharedFolder).start();
-    }
-
-    public void setDestinationFolder(File dest) {
-        this.destinationFolder = dest;
-    }
-
     public List<File> listSharedFiles() {
         if(rootFolder == null || !rootFolder.exists()) return Collections.emptyList();
         File[] files = rootFolder.listFiles();
         if(files == null) return Collections.emptyList();
         return Arrays.asList(files);
-    }
-
-    public File getDestinationFolder() {
-        return destinationFolder;
-    }
-
-    public File getRootFolder() {
-        return rootFolder;
     }
 
     public void assembleChunks(List<File> chunks, File outputFile) throws IOException {
@@ -82,11 +59,16 @@ public class FileManager {
                 WatchKey key = watchService.take();
 
                 key.pollEvents().forEach(event -> {
-                    String message = String.format("event=%s:filename=%s", event.kind(), event.context());
-                    System.out.println(message);
+
                     try {
-                        NetworkManager.getInstance().sendFileNotification(message);
-                    } catch (IOException e) {
+                        Path fullPath = rootFolder.toPath().resolve(event.context().toString());
+
+                        File file = fullPath.toFile();
+
+                        sendFileNotification(file, event.kind().name());
+
+
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
                 });
@@ -99,5 +81,91 @@ public class FileManager {
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
+    }
+
+    private void sendFileNotification(File file, String event) throws Exception {
+
+        String message = "event=" + event +
+                ":filename=" + getFileName(file) +
+                ":fileType=" + getFileType(file) +
+                ":fileSize=" + getFileSize(file) +
+                ":chunkCount=" + getChunkCount(file) +
+                ":hash=" + getHash(file) +
+                ":ip=" + getOwner().ip() +
+                ":port=" + getOwner().port();
+
+        NetworkManager.getInstance().sendFileNotification(message);
+    }
+
+    private String getFileName(File file) {
+        return file.getName();
+    }
+
+    private String getFileType(File file) {
+        String filename = file.getName();
+        int lastDotIndex = filename.lastIndexOf('.');
+        if(lastDotIndex == -1) return "unknown";
+        return filename.substring(lastDotIndex + 1);
+    }
+
+    private String getFileSize(File file) {
+        return String.valueOf(file.length());
+    }
+
+    private String getChunkCount(File file) {
+        if (file.length() == 0) {
+            return "0";
+        }
+        return String.valueOf((int) Math.ceil((double) file.length() / CHUNK_SIZE));
+    }
+
+    private String getHash(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+        }
+
+        byte[] hashBytes  = digest.digest();
+        StringBuilder hashString = new StringBuilder();
+
+        for (byte b : hashBytes ) {
+            hashString.append(String.format("%02x", b));
+        }
+        return hashString.toString();
+    }
+
+    private PeerDTO getOwner() {
+        return NetworkManager.getInstance().getPeerDTO();
+    }
+
+    public File getDestinationFolder() {
+        return destinationFolder;
+    }
+
+    public File getRootFolder() {
+        return rootFolder;
+    }
+
+    public void setRootFolder(File root) {
+        this.rootFolder = root;
+
+        try {
+            for (File file : listSharedFiles()) {
+                sendFileNotification(file, "ENTRY_CREATE");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        new Thread(this::watchSharedFolder).start();
+    }
+
+    public void setDestinationFolder(File dest) {
+        this.destinationFolder = dest;
     }
 }

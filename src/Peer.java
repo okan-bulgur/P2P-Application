@@ -1,5 +1,8 @@
 package src;
 
+import src.DTO.FileDTO;
+import src.DTO.PeerDTO;
+
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -8,7 +11,7 @@ public class Peer {
     private final int port;
     private HashSet<String> ownedChunks;
     private HashSet<PeerDTO> peers;
-    private HashMap<String, PeerDTO> fileToPeer;
+    private HashMap<String, FileDTO> fileToPeer;
 
     public Peer(String ip, int port) {
         this.ip = ip;
@@ -16,10 +19,6 @@ public class Peer {
         this.ownedChunks = new HashSet<>();
         this.peers = new HashSet<>();
         this.fileToPeer = new HashMap<>();
-
-        if (port == 5004) {
-            ownedChunks.add("\\Users\\Okan\\OneDrive\\Belgeler\\CV\\okan_bulgur_cv_1.pdf");
-        }
     }
 
     public void addOwnedChunk(String chunk) {
@@ -46,12 +45,14 @@ public class Peer {
         return peers.contains(peer);
     }
 
-    public void addFileToPeer(String file, PeerDTO peer) {
-        fileToPeer.put(file, peer);
+    public void addFileToPeer(String hash, FileDTO fileDTO) {
+        fileToPeer.put(hash, fileDTO);
+
+        System.out.println("fileToPeer: " + fileToPeer);
     }
 
-    public void removeFileToPeer(String file) {
-        fileToPeer.remove(file);
+    public void removeFileToPeer(String hash) {
+        fileToPeer.remove(hash);
     }
 
     public String getIp() {
@@ -70,7 +71,7 @@ public class Peer {
         return peers;
     }
 
-    public HashMap<String, PeerDTO> getFileToPeer() {
+    public HashMap<String, FileDTO> getFileToPeer() {
         return fileToPeer;
     }
 

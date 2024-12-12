@@ -11,7 +11,13 @@ public class ApplicationManager {
         SwingUtilities.invokeLater(() -> {
             try {
                 Screen screen = new Screen();
-                Peer peer = new Peer(InetAddress.getLocalHost().getHostAddress(), screen.getPeerInfo());
+
+                int port = NetworkManager.getInstance().BROADCAST_PORT;
+                while (port == NetworkManager.getInstance().BROADCAST_PORT){
+                    port = screen.getPeerInfo();
+                }
+
+                Peer peer = new Peer(InetAddress.getLocalHost().getHostAddress(), port);
                 NetworkManager.getInstance(peer);
                 screen.setVisible(true);
             } catch (Exception e) {

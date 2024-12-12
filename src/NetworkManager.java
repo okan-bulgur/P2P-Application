@@ -1,11 +1,13 @@
 package src;
 
+import src.DTO.FileDTO;
+import src.DTO.PeerDTO;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
 import java.util.HashSet;
 
 public class NetworkManager {
@@ -168,11 +170,9 @@ public class NetworkManager {
         System.out.println("Friend request sent to: " + ip + ":" + port + " (" + message + ")");
     }
 
-    protected void sendFileNotification(String notif) throws IOException {
-        String message = "FILE_NOTIFICATION:" +
-                notif + // event=x:filename=x
-                ":ip=" + InetAddress.getLocalHost().getHostAddress() +
-                ":port=" + udpSocket.getLocalPort();
+    protected void sendFileNotification(String notify) throws IOException { // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
+
+        String message = "FILE_NOTIFICATION:" + notify;
 
         byte[] data = message.getBytes();
 
@@ -325,13 +325,10 @@ public class NetworkManager {
         System.out.println("Received broadcast packet from: " + packet.getAddress() + ":" + packet.getPort() + " (" + message + ")\n");
 
         if (message.startsWith("BOOTSTRAP_REQUEST")) { // BOOTSTRAP_REQUEST:ip=x.x.x.x:port=xxxx
-            System.out.println("HEREEEEE");
             String[] parts = message.split(":");
             String[] peerInfo = parts[1].split("=");
             String ip = peerInfo[1].split(":")[0];
             int port = Integer.parseInt(parts[2].split("=")[1]);
-
-            System.out.println("***** Received bootstrap request from: " + ip + ":" + port);
 
             if (InetAddress.getByName(peer.getIp()).getHostAddress().equals(ip) && peer.getPort() == port) {
                 return;
@@ -343,25 +340,31 @@ public class NetworkManager {
             peer.addPeer(newPeer);
         }
 
-        else if (message.startsWith("FILE_NOTIFICATION")) { // FILE_NOTIFICATION:event=x:filename=x:ip=x.x.x.x:port=xxxx
+        else if (message.startsWith("FILE_NOTIFICATION")) { // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
             String[] parts = message.split(":");
             String event = parts[1].split("=")[1];
             String filename = parts[2].split("=")[1];
-            String ip = parts[3].split("=")[1];
-            int port = Integer.parseInt(parts[4].split("=")[1]);
+            String fileType = parts[3].split("=")[1];
+            long fileSize = Long.parseLong(parts[4].split("=")[1]);
+            int chunkCount = Integer.parseInt(parts[5].split("=")[1]);
+            String hash = parts[6].split("=")[1];
+            String ip = parts[7].split("=")[1];
+            int port = Integer.parseInt(parts[8].split("=")[1]);
 
             if (InetAddress.getByName(peer.getIp()).getHostAddress().equals(ip) && peer.getPort() == port) {
                 return;
             }
 
+            FileDTO fileDTO = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port));
+
             if (event.equals("ENTRY_CREATE")) {
-                peer.addFileToPeer(filename, new PeerDTO(ip, port));
+                peer.addFileToPeer(fileDTO.hash(), fileDTO);
             }
             else if (event.equals("ENTRY_DELETE")) {
-                peer.removeFileToPeer(filename);
+                peer.removeFileToPeer(fileDTO.hash());
             }
 
-            peer.addPeer(new PeerDTO(ip, port));
+            peer.addPeer(fileDTO.owner());
         }
     }
 
@@ -391,5 +394,9 @@ public class NetworkManager {
             System.out.println(p);
         }
         System.out.println("\n\n");
+    }
+
+    protected PeerDTO getPeerDTO() {
+        return new PeerDTO(peer.getIp(), peer.getPort());
     }
 }
