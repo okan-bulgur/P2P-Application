@@ -303,17 +303,6 @@ public class Screen extends JFrame {
         searchPanel.add(btnSearch, sgbc);
 
         foundPanel.add(searchPanel, BorderLayout.SOUTH);
-
-        btnSearch.addActionListener(e -> {
-            String search = txtSearch.getText();
-            if (search.isEmpty()) return;
-
-            try {
-                NetworkManager.getInstance().sendSearchRequest(search);
-            } catch (IOException ex) {
-                throw new RuntimeException(ex);
-            }
-        });
     }
 
     private void startMonitoringPeerFiles() {
@@ -355,6 +344,7 @@ public class Screen extends JFrame {
                     if (index >= 0) {
                         FileDTO selectedFile = foundFilesList.getModel().getElementAt(index);
                         DownloadManager.getInstance().downloadFile(selectedFile);
+                        System.out.println("Downloading file: " + selectedFile);
                     }
                 }
             }

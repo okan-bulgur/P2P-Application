@@ -5,34 +5,47 @@ import src.dto.PeerDTO;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 public class Peer {
     private final String ip;
     private final int port;
-    private HashSet<String> ownedChunks;
+    private HashMap<String, String[]> ownedChunks; // hash of file, list of chunk's hash
     private HashSet<PeerDTO> peers;
     private HashMap<String, FileDTO> files;
     private HashMap<String, FileDTO> uploadedFiles;
+    private HashMap<String, FileDTO> downloadedFiles;
 
     public Peer(String ip, int port) {
         this.ip = ip;
         this.port = port;
-        this.ownedChunks = new HashSet<>();
+        this.ownedChunks = new HashMap<>();
         this.peers = new HashSet<>();
         this.files = new HashMap<>();
         this.uploadedFiles = new HashMap<>();
+        this.downloadedFiles = new HashMap<>();
     }
 
-    public void addOwnedChunk(String chunk) {
-        ownedChunks.add(chunk);
+    public void addOwnedChunk(String fileHash, String chunkHash, int chunkIndex) {
+        ownedChunks.get(fileHash)[chunkIndex] = chunkHash;
     }
 
-    public void removeOwnedChunk(String chunk) {
-        ownedChunks.remove(chunk);
+    public void removeOwnedChunk(String fileHash, int chunkIndex) {
+        ownedChunks.get(fileHash)[chunkIndex] = "";
+
+        for(String chunk : ownedChunks.get(fileHash)) {
+            if(!chunk.isEmpty()) {
+                return;
+            }
+        }
+        ownedChunks.remove(fileHash);
     }
 
-    public boolean hasChunk(String chunk) {
-        return ownedChunks.contains(chunk);
+    public boolean hasChunk(String fileHash, int chunkIndex) {
+        if (!ownedChunks.containsKey(fileHash)) {
+            return false;
+        }
+        return !ownedChunks.get(fileHash)[chunkIndex].isEmpty();
     }
 
     public void addPeer(PeerDTO peer) {
@@ -63,6 +76,14 @@ public class Peer {
         uploadedFiles.remove(hash);
     }
 
+    public void addDownloadedFiles(String hash, FileDTO fileDTO) {
+        downloadedFiles.put(hash, fileDTO);
+    }
+
+    public void removeDownloadedFiles(String hash) {
+        downloadedFiles.remove(hash);
+    }
+
     public String getIp() {
         return ip;
     }
@@ -71,8 +92,12 @@ public class Peer {
         return port;
     }
 
-    public HashSet<String> getOwnedChunks() {
+    public HashMap<String, String[]> getOwnedChunks() {
         return ownedChunks;
+    }
+
+    public String getChunkHash(String fileHash, int chunkIndex) {
+        return ownedChunks.get(fileHash)[chunkIndex];
     }
 
     public HashSet<PeerDTO> getPeers() {
@@ -85,6 +110,10 @@ public class Peer {
 
     public HashMap<String, FileDTO> getUploadedFiles() {
         return uploadedFiles;
+    }
+
+    public HashMap<String, FileDTO> getDownloadedFiles() {
+        return downloadedFiles;
     }
 
     public String toString() {

@@ -112,38 +112,27 @@ public class NetworkManager {
         }
     }
 
-    public void sendSearchRequest(String filename) throws IOException { // SEARCH_REQUEST:filename=x:ip=x.x.x.x:port=xxxx:ttl=x
-        String message = "SEARCH_REQUEST:" +
-                "filename=" + filename +
+    public void sendChunkRequest(String hash, int index) throws IOException { // CHUNK_REQUEST:hash=x:index:xip=x.x.x.x:port=xxxx:ttl=x:visited=ip:port,...
+        String message = "CHUNK_REQUEST:" +
+                "hash=" + hash +
+                ":index=" + index +
                 ":ip=" + InetAddress.getLocalHost().getHostAddress() +
                 ":port=" + udpSocket.getLocalPort() +
                 ":ttl=" + MAX_TTL + ":" +
                 "visited=" + InetAddress.getLocalHost().getHostAddress() + ":" + udpSocket.getLocalPort();
 
-        System.out.println("Send Request peer " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
+        System.out.println("Send Chunk Request from " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
         byte[] data = message.getBytes();
 
         if (peer.getPeers().isEmpty()) {
-            System.out.println("No peers to send search request to.");
-            /*
-            sendBootstrapRequest();
-
-            try {
-                Thread.sleep(2000); // Sleep for 2 seconds
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                System.out.println("Sleep interrupted");
-            }
-
-            sendSearchRequest(filename);
-            return;
-            */
+            System.out.println("No peers to send chunk request to.");
+            // todo: fix there
             return;
         }
 
         for(PeerDTO peer : peer.getPeers()) {
 
-            System.out.println("Sending search request to: " + peer.ip() + ":" + peer.port());
+            System.out.println("Sending Chunk Request to: " + peer.ip() + ":" + peer.port());
             DatagramPacket packet = new DatagramPacket(data, data.length,
                     InetAddress.getByName(peer.ip()), peer.port());
             udpSocket.send(packet);
@@ -175,10 +164,12 @@ public class NetworkManager {
         broadcastSocket.send(packet);
     }
 
-    private void spreadSearchRequest(String filename, String requesterIP, int requesterPort, int ttl, HashSet<PeerDTO> visited) throws IOException {
+    private void spreadChunkRequest(String hash, int index, String requesterIP, int requesterPort, int ttl, HashSet<PeerDTO> visited) throws IOException {
+        peer.addPeer(new PeerDTO(requesterIP, requesterPort));
+        sendFriendRequest(requesterIP, requesterPort);
+
         if (peer.getPeers().isEmpty()) {
-            System.out.println("No peers to send search request to.");
-            peer.addPeer(new PeerDTO(requesterIP, requesterPort));
+            System.out.println("No peers to send chunk request to.");
             return;
         }
 
@@ -187,8 +178,9 @@ public class NetworkManager {
             visitedInfo.append(v.ip()).append(":").append(v.port()).append(",");
         }
 
-        String message = "SEARCH_REQUEST:" +
-                "filename=" + filename + ":" +
+        String message = "CHUNK_REQUEST:" +
+                "hash=" + hash +
+                ":index=" + index +
                 "ip=" + requesterIP + ":" +
                 "port=" + requesterPort + ":" +
                 "ttl=" + ttl + ":" +
@@ -201,7 +193,7 @@ public class NetworkManager {
                 continue;
             }
 
-            System.out.println("Sending search request to: " + peer.ip() + ":" + peer.port());
+            System.out.println("Sending chunk request to: " + peer.ip() + ":" + peer.port());
             DatagramPacket packet = new DatagramPacket(data, data.length,
                     InetAddress.getByName(peer.ip()), peer.port());
             udpSocket.send(packet);
@@ -211,20 +203,30 @@ public class NetworkManager {
     private void processResponse(DatagramPacket packet) throws IOException {
         String message = new String(packet.getData(), 0, packet.getLength()).trim();
 
-        if (message.startsWith("SEARCH_REQUEST")) { // SEARCH_REQUEST:filename=x:ip=x.x.x.x:port=xxxx:ttl=x:visited=ip:port,...
+        if (message.startsWith("CHUNK_REQUEST")) {  // CHUNK_REQUEST:hash=x:index=x:ip=x.x.x.x:port=xxxx:ttl=x:visited=ip:port,...
             String[] parts = message.split(":");
-            String filename = parts[1].split("=")[1];
-            String ip = parts[2].split("=")[1];
-            int port = Integer.parseInt(parts[3].split("=")[1]);
-            int ttl = Integer.parseInt(parts[4].split("=")[1]);
+            String fileHash = parts[1].split("=")[1];
+            int index = Integer.parseInt(parts[2].split("=")[1]);
+            String ip = parts[3].split("=")[1];
+            int port = Integer.parseInt(parts[4].split("=")[1]);
+            int ttl = Integer.parseInt(parts[5].split("=")[1]);
 
-            if (peer.hasChunk(filename)) {
-                String responseMessage = "SEARCH_RESULT:" +
-                        "filename=" + filename + ":" +
-                        "ip=" + InetAddress.getLocalHost().getHostAddress() + ":" +
-                        "port=" + udpSocket.getLocalPort();
+            if (peer.hasChunk(fileHash, index)) {
+                byte[] chunkData = FileManager.getInstance().getChunkData(fileHash, index);
 
-                byte[] responseData = responseMessage.getBytes();
+                String responseMessage = "CHUNK_RESULT:" +
+                        "fileHash=" + fileHash +
+                        ":index=" + index +
+                        ":chunkHash=" + peer.getChunkHash(fileHash, index) +
+                        ":chunkSize=" + chunkData.length +
+                        ":ip=" + InetAddress.getLocalHost().getHostAddress() +
+                        ":port=" + udpSocket.getLocalPort();
+
+                byte[] responseHeader = responseMessage.getBytes();
+                byte[] responseData = new byte[responseHeader.length + chunkData.length];
+
+                System.arraycopy(responseHeader, 0, responseData, 0, responseHeader.length);
+                System.arraycopy(chunkData, 0, responseData, responseHeader.length, chunkData.length);
 
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseData, responseData.length,
@@ -232,7 +234,7 @@ public class NetworkManager {
                 );
                 udpSocket.send(responsePacket);
 
-                System.out.println("Sent response to: " + ip + ":" + port + " (" + responseMessage + ")");
+                System.out.println("Sent Chunk Result to: " + ip + ":" + port + " (" + responseMessage + ")");
             }
             else {
                 HashSet<PeerDTO> visited = new HashSet<>();
@@ -262,25 +264,40 @@ public class NetworkManager {
                     return;
                 }
 
-                spreadSearchRequest(filename, ip, port, ttl - 1, visited);
+                spreadChunkRequest(fileHash, index, ip, port, ttl - 1, visited);
             }
 
             peer.addPeer(new PeerDTO(ip, port));
         }
 
-        else if (message.startsWith("SEARCH_RESULT")) { // SEARCH_RESULT:filename=x:ip=x.x.x.x:port=xxxx
-            String[] parts = message.split(":");
-            String filename = parts[1].split("=")[1];
-            String ip = parts[2].split("=")[1];
-            int port = Integer.parseInt(parts[3].split("=")[1]);
+        else if (message.startsWith("CHUNK_RESULT")) { // CHUNK_RESULT:fileHash=x:index=x:chunk_hash=x:chunkSize=x:ip=x.x.x.x:port=xxxx|chunkData
 
-            peer.addPeer(new PeerDTO(ip, port));
+            byte[] data = packet.getData();
+            int length = packet.getLength();
 
-            if (peer.hasChunk(filename)) {
+            String header = new String(data, 0, length).split("\n")[0];
+
+            String[] headerParts = header.split(":");
+            String fileHash = headerParts[1].split("=")[1];
+            int index = Integer.parseInt(headerParts[2].split("=")[1]);
+            String chunkHash = headerParts[3].split("=")[1];
+            int chunkSize = Integer.parseInt(headerParts[4].split("=")[1]);
+            String ip = headerParts[5].split("=")[1];
+            int port = Integer.parseInt(headerParts[6].split("=")[1]);
+
+            if(peer.hasChunk(fileHash, index)) {
                 return;
             }
 
-            // todo: download file from newPeer
+            byte[] chunkData = new byte[chunkSize];
+            System.arraycopy(data, header.length() + 1, chunkData, 0, chunkSize);
+
+            FileManager.getInstance().saveChunkData(fileHash, chunkHash, index, chunkData);
+
+            System.out.println("Received chunk result from: " + ip + ":" + port + " (" + header + ")");
+
+            sendFriendRequest(ip, port);
+            peer.addPeer(new PeerDTO(ip, port));
         }
 
         else if (message.startsWith("FRIEND_REQUEST")) { // FRIEND_REQUEST:ip=x.x.x.x:port=xxxx

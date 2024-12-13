@@ -3,10 +3,7 @@ package src;
 import src.dto.FileDTO;
 import src.dto.PeerDTO;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -19,6 +16,7 @@ public class FileManager {
     private static FileManager instance;
     private File rootFolder;
     private File destinationFolder;
+    private final String DOWNLOADED_CHUNK_FOLDER = "downloaded";
 
     public static FileManager getInstance() {
         if(instance == null) {
@@ -34,20 +32,113 @@ public class FileManager {
         return Arrays.asList(files);
     }
 
-    public void assembleChunks(List<File> chunks, File outputFile) throws IOException {
-        try(FileOutputStream fos = new FileOutputStream(outputFile)) {
+    protected byte[] getChunkData(String filehash, int chunkIndex) throws IOException {
+        File file = null;
 
-            chunks.sort((f1, f2) -> { // file:chunk=1, file:chunk=2, file:chunk=3, ...
-                String[] f1Parts = f1.getName().split(":chunk=");
-                String[] f2Parts = f2.getName().split(":chunk=");
-                return Integer.compare(Integer.parseInt(f1Parts[1]), Integer.parseInt(f2Parts[1]));
-            });
+        if (NetworkManager.getInstance().getPeer().getUploadedFiles().containsKey(filehash)) {
+            FileDTO fileDTO = NetworkManager.getInstance().getPeer().getUploadedFiles().get(filehash);
+            file = new File(rootFolder, fileDTO.filename());
+        }
+        else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) {
+            FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
+            String fullPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileDTO.filename();
+            file = new File(fullPath);
 
-            System.out.println("Sorted chunks: " + chunks);
-
-            for(File chunk : chunks) {
-                Files.copy(chunk.toPath(), fos);
+            byte[] chunkData = new byte[(int) file.length()];
+            try (FileInputStream fis = new FileInputStream(file)) {
+                fis.read(chunkData);
             }
+            return chunkData;
+
+        }
+        else if (NetworkManager.getInstance().getPeer().getDownloadedFiles().containsKey(filehash)) {
+            FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
+            file = new File(destinationFolder, fileDTO.filename());
+        } else {
+            throw new IOException("File not found");
+        }
+
+        long fileLength = file.length();
+        long chunkStart = (long) chunkIndex * CHUNK_SIZE;
+
+        if (chunkStart >= fileLength) {
+            throw new IOException("Invalid chunk index: " + chunkIndex);
+        }
+
+        int chunkSize = (int) Math.min(CHUNK_SIZE, fileLength - chunkStart);
+
+        byte[] chunkData = new byte[chunkSize];
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            raf.seek(chunkStart); // Chunk'ın başlangıç konumuna gidin
+            raf.readFully(chunkData); // Chunk'ı okuyun
+        }
+
+        return chunkData;
+    }
+
+    protected void saveChunkData(String fileHash, String chunkHash, int chunkIndex, byte[] chunkData) throws IOException {
+        try {
+            String fullPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + chunkIndex;
+            File chunkFile  = new File(fullPath);
+
+            try (FileOutputStream fos = new FileOutputStream(chunkFile)) {
+                fos.write(chunkData);
+            }
+
+            if (getHash(chunkFile).equals(chunkHash)) {
+                System.out.println("Chunk " + chunkIndex + " saved successfully for file " + fileHash);
+            } else {
+                throw new IOException("Chunk hash mismatch: " + chunkFile.getName());
+            }
+
+            NetworkManager.getInstance().getPeer().addOwnedChunk(fileHash, chunkHash, chunkIndex);
+
+            System.out.println("Saved chunk " + chunkIndex + " for file " + fileHash);
+        } catch (IOException e) {
+            System.err.println("Error saving chunk " + chunkIndex + ": " + e.getMessage());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected void mergeChunk(String fileHash, int totalChunks) throws IOException {
+        FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(fileHash);
+        String fullPath = destinationFolder + File.separator + fileDTO.filename();
+        File outputFile = new File(fullPath);
+
+        try (FileOutputStream fos = new FileOutputStream(fullPath)) {
+            for (int i = 0; i < totalChunks; i++) {
+
+                String chunkPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + i;
+                File chunkFile = new File(chunkPath);
+
+                if (!chunkFile.exists()) {
+                    throw new IOException("Missing chunk file: " + chunkFile.getName());
+                }
+
+                try (FileInputStream fis = new FileInputStream(chunkFile)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                }
+
+                System.out.println("Merged chunk: " + chunkFile.getName());
+            }
+
+            if (getHash(outputFile).equals(fileHash)) {
+                System.out.println("File hash matched: " + fileHash);
+            } else {
+                throw new IOException("File hash mismatch: " + outputFile.getName());
+            }
+
+            System.out.println("File merge completed: " + outputFile.getName());
+
+        } catch (IOException e) {
+            System.err.println("Error merging chunks: " + e.getMessage());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
