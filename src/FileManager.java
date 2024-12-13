@@ -1,6 +1,7 @@
 package src;
 
-import src.DTO.PeerDTO;
+import src.dto.FileDTO;
+import src.dto.PeerDTO;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -61,12 +62,22 @@ public class FileManager {
                 key.pollEvents().forEach(event -> {
 
                     try {
+
+                        if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            for (FileDTO file : NetworkManager.getInstance().getPeer().getUploadedFiles().values()) {
+                                if (file.filename().equals(event.context().toString())) {
+                                    sendFileDelNotification(file, event.kind().name());
+                                    NetworkManager.getInstance().getPeer().removeFiles(file.hash());
+                                    return;
+                                }
+                            }
+                        }
+
                         Path fullPath = rootFolder.toPath().resolve(event.context().toString());
 
                         File file = fullPath.toFile();
 
                         sendFileNotification(file, event.kind().name());
-
 
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -83,6 +94,19 @@ public class FileManager {
         }
     }
 
+    private void sendFileDelNotification(FileDTO file, String event) throws Exception {
+        String message = "event=" + event +
+                ":filename=" + file.filename() +
+                ":fileType=" + file.fileType() +
+                ":fileSize=" + file.fileSize() +
+                ":chunkCount=" + file.chunkCount() +
+                ":hash=" + file.hash() +
+                ":ip=" + file.owner().ip() +
+                ":port=" + file.owner().port();
+
+        NetworkManager.getInstance().sendFileNotification(message);
+    }
+
     private void sendFileNotification(File file, String event) throws Exception {
 
         String message = "event=" + event +
@@ -95,6 +119,9 @@ public class FileManager {
                 ":port=" + getOwner().port();
 
         NetworkManager.getInstance().sendFileNotification(message);
+
+        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
+        NetworkManager.getInstance().getPeer().addUploadedFiles(getHash(file), newFile);
     }
 
     private String getFileName(File file) {

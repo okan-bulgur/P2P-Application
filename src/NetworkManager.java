@@ -1,7 +1,7 @@
 package src;
 
-import src.DTO.FileDTO;
-import src.DTO.PeerDTO;
+import src.dto.FileDTO;
+import src.dto.PeerDTO;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -12,7 +12,7 @@ import java.util.HashSet;
 
 public class NetworkManager {
     private static NetworkManager instance;
-    private final Peer peer;
+    private Peer peer;
 
     private DatagramSocket udpSocket;
     private boolean isConnected = false;
@@ -26,19 +26,11 @@ public class NetworkManager {
     final String BROADCAST_IP = "255.255.255.255";
     final int BROADCAST_PORT = 5050;
 
-    protected static synchronized NetworkManager getInstance(Peer peer) {
+    protected static synchronized NetworkManager getInstance() {
         if (instance == null) {
-            instance = new NetworkManager(peer);
+            instance = new NetworkManager();
         }
         return instance;
-    }
-
-    protected static synchronized NetworkManager getInstance() {
-        return getInstance(new Peer("localhost", 8080));
-    }
-
-    protected NetworkManager(Peer peer) {
-        this.peer = peer;
     }
 
     protected void connect() {
@@ -358,10 +350,10 @@ public class NetworkManager {
             FileDTO fileDTO = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port));
 
             if (event.equals("ENTRY_CREATE")) {
-                peer.addFileToPeer(fileDTO.hash(), fileDTO);
+                peer.addFiles(fileDTO.hash(), fileDTO);
             }
             else if (event.equals("ENTRY_DELETE")) {
-                peer.removeFileToPeer(fileDTO.hash());
+                peer.removeFiles(fileDTO.hash());
             }
 
             peer.addPeer(fileDTO.owner());
@@ -398,5 +390,13 @@ public class NetworkManager {
 
     protected PeerDTO getPeerDTO() {
         return new PeerDTO(peer.getIp(), peer.getPort());
+    }
+
+    protected Peer getPeer() {
+        return peer;
+    }
+
+    protected void setPeer(Peer peer) {
+        this.peer = peer;
     }
 }

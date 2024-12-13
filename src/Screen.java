@@ -1,14 +1,16 @@
 package src;
 
+import src.dto.FileDTO;
+
 import javax.swing.*;
 import java.awt.*;
-import java.io.File;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.List;
+import java.util.HashMap;
 
 public class Screen extends JFrame {
+    private static Screen instance;
 
     private JPanel mainPanel;
 
@@ -29,12 +31,20 @@ public class Screen extends JFrame {
     private JButton btnDelMask;
 
     private JList<String> downloadingFilesList;
-    private JList<String> foundFilesList;
+    protected DefaultListModel<FileDTO> foundFilesModel;
+    private JList<FileDTO> foundFilesList;
 
     private JTextField txtSearch;
     private JButton btnSearch;
 
     private GridBagConstraints gbc;
+
+    public static Screen getInstance() {
+        if(instance == null) {
+            instance = new Screen();
+        }
+        return instance;
+    }
 
     public Screen() {
         super("P2P File Sharing Application");
@@ -262,9 +272,12 @@ public class Screen extends JFrame {
         JPanel foundPanel = new JPanel(new BorderLayout());
         foundPanel.setBorder(BorderFactory.createTitledBorder("Found files"));
 
-        foundFilesList = new JList<>(new DefaultListModel<>());
+        foundFilesModel  = new DefaultListModel<>();
+        foundFilesList = new JList<>(foundFilesModel);
         foundPanel.add(new JScrollPane(foundFilesList), BorderLayout.CENTER);
 
+        startMonitoringPeerFiles();
+        selectFileToDownload();
         // Search
         setupSearchPanel(foundPanel);
 
@@ -303,7 +316,48 @@ public class Screen extends JFrame {
         });
     }
 
-    public int getPeerInfo() throws UnknownHostException {
-        return Integer.parseInt(JOptionPane.showInputDialog("Enter the port number of the peer: "));
+    private void startMonitoringPeerFiles() {
+        Timer timer = new Timer(1000, e -> updateFoundFilesList());
+        timer.start();
+    }
+
+    private void updateFoundFilesList() {
+        HashMap<String, FileDTO> peerFiles = NetworkManager.getInstance().getPeer().getFiles();
+
+        // Add new files
+        for (String file : peerFiles.keySet()) {
+            if (!foundFilesModel.contains(peerFiles.get(file))) {
+                System.out.println("Adding file: " + peerFiles.get(file));
+                foundFilesModel.addElement(peerFiles.get(file));
+            }
+        }
+
+        // Remove files that are no longer shared
+        for (int i = 0; i < foundFilesModel.size(); i++) {
+            FileDTO fileInModel = foundFilesModel.get(i);
+            if (!peerFiles.containsKey(fileInModel.hash())) {
+                foundFilesModel.remove(i);
+                continue;
+            }
+
+            if(peerFiles.containsKey(fileInModel.hash()) && !peerFiles.get(fileInModel.hash()).filename().equals(fileInModel.filename())){
+                foundFilesModel.set(i, peerFiles.get(fileInModel.hash()));
+            }
+        }
+    }
+
+    private void selectFileToDownload(){
+        foundFilesList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int index = foundFilesList.locationToIndex(e.getPoint());
+                    if (index >= 0) {
+                        FileDTO selectedFile = foundFilesList.getModel().getElementAt(index);
+                        DownloadManager.getInstance().downloadFile(selectedFile);
+                    }
+                }
+            }
+        });
     }
 }

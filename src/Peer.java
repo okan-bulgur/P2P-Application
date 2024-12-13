@@ -1,7 +1,7 @@
 package src;
 
-import src.DTO.FileDTO;
-import src.DTO.PeerDTO;
+import src.dto.FileDTO;
+import src.dto.PeerDTO;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,14 +11,16 @@ public class Peer {
     private final int port;
     private HashSet<String> ownedChunks;
     private HashSet<PeerDTO> peers;
-    private HashMap<String, FileDTO> fileToPeer;
+    private HashMap<String, FileDTO> files;
+    private HashMap<String, FileDTO> uploadedFiles;
 
     public Peer(String ip, int port) {
         this.ip = ip;
         this.port = port;
         this.ownedChunks = new HashSet<>();
         this.peers = new HashSet<>();
-        this.fileToPeer = new HashMap<>();
+        this.files = new HashMap<>();
+        this.uploadedFiles = new HashMap<>();
     }
 
     public void addOwnedChunk(String chunk) {
@@ -45,14 +47,20 @@ public class Peer {
         return peers.contains(peer);
     }
 
-    public void addFileToPeer(String hash, FileDTO fileDTO) {
-        fileToPeer.put(hash, fileDTO);
-
-        System.out.println("fileToPeer: " + fileToPeer);
+    public void addFiles(String hash, FileDTO fileDTO) {
+        files.put(hash, fileDTO);
     }
 
-    public void removeFileToPeer(String hash) {
-        fileToPeer.remove(hash);
+    public void removeFiles(String hash) {
+        files.remove(hash);
+    }
+
+    public void addUploadedFiles(String hash, FileDTO fileDTO) {
+        uploadedFiles.put(hash, fileDTO);
+    }
+
+    public void removeUploadedFiles(String hash) {
+        uploadedFiles.remove(hash);
     }
 
     public String getIp() {
@@ -71,8 +79,12 @@ public class Peer {
         return peers;
     }
 
-    public HashMap<String, FileDTO> getFileToPeer() {
-        return fileToPeer;
+    public HashMap<String, FileDTO> getFiles() {
+        return files;
+    }
+
+    public HashMap<String, FileDTO> getUploadedFiles() {
+        return uploadedFiles;
     }
 
     public String toString() {
