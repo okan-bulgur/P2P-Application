@@ -5,7 +5,6 @@ import src.dto.PeerDTO;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 
 public class Peer {
     private final String ip;

@@ -7,6 +7,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 
 public class Screen extends JFrame {
@@ -343,8 +344,14 @@ public class Screen extends JFrame {
                     int index = foundFilesList.locationToIndex(e.getPoint());
                     if (index >= 0) {
                         FileDTO selectedFile = foundFilesList.getModel().getElementAt(index);
+
+                        if(!NetworkManager.getInstance().getPeer().getOwnedChunks().containsKey(selectedFile.hash())) {
+                            String[] chunks = new String[selectedFile.chunkCount()];
+                            Arrays.fill(chunks, "");
+                            NetworkManager.getInstance().getPeer().getOwnedChunks().put(selectedFile.hash(), chunks);
+                        }
+
                         DownloadManager.getInstance().downloadFile(selectedFile);
-                        System.out.println("Downloading file: " + selectedFile);
                     }
                 }
             }

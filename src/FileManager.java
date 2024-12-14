@@ -11,12 +11,12 @@ import java.util.Collections;
 import java.util.List;
 
 public class FileManager {
-    final int CHUNK_SIZE = 256 * 1024;
+    final int CHUNK_SIZE = 500;
 
     private static FileManager instance;
     private File rootFolder;
     private File destinationFolder;
-    private final String DOWNLOADED_CHUNK_FOLDER = "downloaded";
+    private final String CHUNK_FOLDER = "chunks";
 
     public static FileManager getInstance() {
         if(instance == null) {
@@ -33,15 +33,15 @@ public class FileManager {
     }
 
     protected byte[] getChunkData(String filehash, int chunkIndex) throws IOException {
-        File file = null;
+        File file;
 
         if (NetworkManager.getInstance().getPeer().getUploadedFiles().containsKey(filehash)) {
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getUploadedFiles().get(filehash);
             file = new File(rootFolder, fileDTO.filename());
         }
-        else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) {
+        else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) { //map of owned chunk
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
-            String fullPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileDTO.filename();
+            String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileDTO.filename();
             file = new File(fullPath);
 
             byte[] chunkData = new byte[(int) file.length()];
@@ -69,8 +69,8 @@ public class FileManager {
 
         byte[] chunkData = new byte[chunkSize];
         try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-            raf.seek(chunkStart); // Chunk'ın başlangıç konumuna gidin
-            raf.readFully(chunkData); // Chunk'ı okuyun
+            raf.seek(chunkStart);
+            raf.readFully(chunkData);
         }
 
         return chunkData;
@@ -78,17 +78,21 @@ public class FileManager {
 
     protected void saveChunkData(String fileHash, String chunkHash, int chunkIndex, byte[] chunkData) throws IOException {
         try {
-            String fullPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + chunkIndex;
+            String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + chunkIndex;
             File chunkFile  = new File(fullPath);
+            File parentDir = chunkFile.getParentFile();
+
+            if (!parentDir.exists() && !parentDir.mkdirs()) {
+                throw new IOException("Failed to create directories for path: " + parentDir.getAbsolutePath());
+            }
 
             try (FileOutputStream fos = new FileOutputStream(chunkFile)) {
                 fos.write(chunkData);
             }
 
-            if (getHash(chunkFile).equals(chunkHash)) {
-                System.out.println("Chunk " + chunkIndex + " saved successfully for file " + fileHash);
-            } else {
-                throw new IOException("Chunk hash mismatch: " + chunkFile.getName());
+            String calculatedHash = getHash(chunkFile);
+            if (!calculatedHash.equals(chunkHash)) {
+                throw new IOException("Chunk hash mismatch: Expected " + chunkHash + ", Found " + calculatedHash);
             }
 
             NetworkManager.getInstance().getPeer().addOwnedChunk(fileHash, chunkHash, chunkIndex);
@@ -109,7 +113,7 @@ public class FileManager {
         try (FileOutputStream fos = new FileOutputStream(fullPath)) {
             for (int i = 0; i < totalChunks; i++) {
 
-                String chunkPath = destinationFolder + File.separator + DOWNLOADED_CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + i;
+                String chunkPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + i;
                 File chunkFile = new File(chunkPath);
 
                 if (!chunkFile.exists()) {
@@ -213,6 +217,34 @@ public class FileManager {
 
         FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
         NetworkManager.getInstance().getPeer().addUploadedFiles(getHash(file), newFile);
+
+        String[] chunks = new String[newFile.chunkCount()];
+        Arrays.fill(chunks, "");
+        NetworkManager.getInstance().getPeer().getOwnedChunks().put(newFile.hash(), chunks);
+
+        for(int i=0; i < newFile.chunkCount(); i++) {
+            String chunkHash = getHashOfChunk(newFile.hash(), i);
+            NetworkManager.getInstance().getPeer().addOwnedChunk(newFile.hash(), chunkHash, i);
+        }
+
+        System.out.println("CHUNKS:\n" + NetworkManager.getInstance().getPeer().getOwnedChunks());
+    }
+
+    protected String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
+        byte[] chunkData = getChunkData(fileHash, chunkIndex);
+
+        File tempFile = File.createTempFile(fileHash, ".tmp");
+        tempFile.deleteOnExit();
+
+        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+            fos.write(chunkData);
+        }
+
+        String hash = getHash(tempFile);
+
+        tempFile.delete();
+
+        return hash;
     }
 
     private String getFileName(File file) {
@@ -237,7 +269,7 @@ public class FileManager {
         return String.valueOf((int) Math.ceil((double) file.length() / CHUNK_SIZE));
     }
 
-    private String getHash(File file) throws Exception {
+    protected String getHash(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
 
         try (FileInputStream fis = new FileInputStream(file)) {

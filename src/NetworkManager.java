@@ -121,11 +121,11 @@ public class NetworkManager {
                 ":ttl=" + MAX_TTL + ":" +
                 "visited=" + InetAddress.getLocalHost().getHostAddress() + ":" + udpSocket.getLocalPort();
 
-        System.out.println("Send Chunk Request from " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
+        System.out.println("\nSend Chunk Request from " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
         byte[] data = message.getBytes();
 
         if (peer.getPeers().isEmpty()) {
-            System.out.println("No peers to send chunk request to.");
+            System.out.println("\nNo peers to send chunk request to.");
             // todo: fix there
             return;
         }
@@ -220,7 +220,7 @@ public class NetworkManager {
                         ":chunkHash=" + peer.getChunkHash(fileHash, index) +
                         ":chunkSize=" + chunkData.length +
                         ":ip=" + InetAddress.getLocalHost().getHostAddress() +
-                        ":port=" + udpSocket.getLocalPort();
+                        ":port=" + udpSocket.getLocalPort() + "<data>";
 
                 byte[] responseHeader = responseMessage.getBytes();
                 byte[] responseData = new byte[responseHeader.length + chunkData.length];
@@ -273,9 +273,8 @@ public class NetworkManager {
         else if (message.startsWith("CHUNK_RESULT")) { // CHUNK_RESULT:fileHash=x:index=x:chunk_hash=x:chunkSize=x:ip=x.x.x.x:port=xxxx|chunkData
 
             byte[] data = packet.getData();
-            int length = packet.getLength();
 
-            String header = new String(data, 0, length).split("\n")[0];
+            String header = message.split("<data>")[0];
 
             String[] headerParts = header.split(":");
             String fileHash = headerParts[1].split("=")[1];
@@ -289,8 +288,19 @@ public class NetworkManager {
                 return;
             }
 
+            int dataLength = message.split("<data>")[1].getBytes().length;
+            int headerLength = header.getBytes().length;
+            int headerRegexLength = "<data>".getBytes().length;
+            int offset = headerLength + headerRegexLength;
+            int packetLength = packet.getLength();
+
+            if (offset + chunkSize > packetLength) {
+                System.err.println("Insufficient data for chunk: offset=" + offset + ", chunkSize=" + chunkSize + ", dataLength=" + data.length);
+                return;
+            }
+
             byte[] chunkData = new byte[chunkSize];
-            System.arraycopy(data, header.length() + 1, chunkData, 0, chunkSize);
+            System.arraycopy(data, offset, chunkData, 0, chunkSize);
 
             FileManager.getInstance().saveChunkData(fileHash, chunkHash, index, chunkData);
 
