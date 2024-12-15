@@ -4,8 +4,6 @@ import javax.swing.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-import static java.lang.Thread.sleep;
-
 public class ApplicationManager {
 
     public static void main(String[] args) throws UnknownHostException {
@@ -13,7 +11,7 @@ public class ApplicationManager {
         SwingUtilities.invokeLater(() -> {
             try {
 
-                int port = Integer.parseInt(JOptionPane.showInputDialog("Enter the port number of the peer: "));
+                int port = Integer.parseInt(JOptionPane.showInputDialog("Enter the port number: "));
 
                 Peer peer = new Peer(InetAddress.getLocalHost().getHostAddress(), port);
 

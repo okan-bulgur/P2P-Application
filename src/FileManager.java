@@ -16,7 +16,7 @@ public class FileManager {
     private static FileManager instance;
     private File rootFolder;
     private File destinationFolder;
-    private final String CHUNK_FOLDER = "chunks";
+    protected final String CHUNK_FOLDER = "chunks";
 
     public static FileManager getInstance() {
         if(instance == null) {
@@ -127,20 +127,18 @@ public class FileManager {
                         fos.write(buffer, 0, bytesRead);
                     }
                 }
-
-                System.out.println("Merged chunk: " + chunkFile.getName());
             }
 
             if (getHash(outputFile).equals(fileHash)) {
-                System.out.println("File hash matched: " + fileHash);
+                System.out.println("\nFile hash matched: " + fileHash);
             } else {
-                throw new IOException("File hash mismatch: " + outputFile.getName());
+                throw new IOException("\nFile hash mismatch: " + outputFile.getName());
             }
 
-            System.out.println("File merge completed: " + outputFile.getName());
+            System.out.println("\nFile merge completed: " + outputFile.getName());
 
         } catch (IOException e) {
-            System.err.println("Error merging chunks: " + e.getMessage());
+            System.err.println("\nError merging chunks: " + e.getMessage());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -230,7 +228,7 @@ public class FileManager {
         System.out.println("CHUNKS:\n" + NetworkManager.getInstance().getPeer().getOwnedChunks());
     }
 
-    protected String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
+    private String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
         byte[] chunkData = getChunkData(fileHash, chunkIndex);
 
         File tempFile = File.createTempFile(fileHash, ".tmp");
@@ -317,5 +315,30 @@ public class FileManager {
 
     public void setDestinationFolder(File dest) {
         this.destinationFolder = dest;
+
+        if (!destinationFolder.exists() || !destinationFolder.isDirectory()) {
+            return;
+        }
+
+        File[] files = destinationFolder.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isFile()) {
+                    System.out.println("File: " + file.getName());
+
+                    try {
+                        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
+                        NetworkManager.getInstance().getPeer().addDownloadedFiles(getHash(file), newFile);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+
+                } else if (file.isDirectory()) {
+                    System.out.println("Directory: " + file.getName());
+                }
+            }
+        } else {
+            System.err.println("The directory is empty or cannot be accessed.");
+        }
     }
 }

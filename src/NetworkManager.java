@@ -3,6 +3,7 @@ package src;
 import src.dto.FileDTO;
 import src.dto.PeerDTO;
 
+import javax.swing.*;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -38,6 +39,7 @@ public class NetworkManager {
         if (isConnected) {
             return;
         }
+
         try {
             InetAddress address = InetAddress.getByName(peer.getIp());
             int port = peer.getPort();
@@ -63,12 +65,11 @@ public class NetworkManager {
             sendBootstrapRequest();
 
 
-            System.out.println("IP: " + peer.getIp() + " Port: " + peer.getPort() + " is connecting to the network.\n");
+            System.out.println("\nIP: " + peer.getIp() + " Port: " + peer.getPort() + " is connecting to the network.\n");
         }
         catch (IOException e) {
             disconnect();
-            System.out.println("Failed to connect to the network.");
-            e.printStackTrace();
+            System.err.println("Failed to connect to the network. Error: " + e.getMessage());
         }
     }
 
@@ -116,10 +117,10 @@ public class NetworkManager {
         String message = "CHUNK_REQUEST:" +
                 "hash=" + hash +
                 ":index=" + index +
-                ":ip=" + InetAddress.getLocalHost().getHostAddress() +
-                ":port=" + udpSocket.getLocalPort() +
+                ":ip=" + peer.getIp() +
+                ":port=" + peer.getPort() +
                 ":ttl=" + MAX_TTL + ":" +
-                "visited=" + InetAddress.getLocalHost().getHostAddress() + ":" + udpSocket.getLocalPort();
+                "visited=" + peer.getIp() + ":" + peer.getPort();
 
         System.out.println("\nSend Chunk Request from " + peer.getIp() + ":" + peer.getPort() + " messge: " + message);
         byte[] data = message.getBytes();
@@ -141,8 +142,8 @@ public class NetworkManager {
 
     private void sendFriendRequest(String ip, int port) throws IOException {
         String message = "FRIEND_REQUEST:" +
-                "ip=" + InetAddress.getLocalHost().getHostAddress() +
-                ":port=" + udpSocket.getLocalPort();
+                "ip=" + peer.getIp() +
+                ":port=" + peer.getPort();
 
         byte[] data = message.getBytes();
         DatagramPacket packet = new DatagramPacket(data, data.length,
@@ -219,8 +220,8 @@ public class NetworkManager {
                         ":index=" + index +
                         ":chunkHash=" + peer.getChunkHash(fileHash, index) +
                         ":chunkSize=" + chunkData.length +
-                        ":ip=" + InetAddress.getLocalHost().getHostAddress() +
-                        ":port=" + udpSocket.getLocalPort() + "<data>";
+                        ":ip=" + peer.getIp() +
+                        ":port=" + peer.getPort() + "<data>";
 
                 byte[] responseHeader = responseMessage.getBytes();
                 byte[] responseData = new byte[responseHeader.length + chunkData.length];
@@ -248,10 +249,10 @@ public class NetworkManager {
                     }
                 }
 
-                visited.add(new PeerDTO(InetAddress.getLocalHost().getHostAddress(), udpSocket.getLocalPort()));
+                visited.add(new PeerDTO(peer.getIp(), peer.getPort()));
 
                 for (PeerDTO v : visited) {
-                    if (v.ip().equals(InetAddress.getLocalHost().getHostAddress()) && v.port() == udpSocket.getLocalPort()) {
+                    if (v.ip().equals(peer.getIp()) && v.port() == peer.getPort()) {
                         continue;
                     }
                     if (!peer.hasPeer(v)) {
@@ -390,8 +391,8 @@ public class NetworkManager {
     private void sendBootstrapRequest() throws IOException {
         System.out.println("Sending bootstrap request...");
         String message = "BOOTSTRAP_REQUEST:" +
-                "ip=" + InetAddress.getLocalHost().getHostAddress() +
-                ":port=" + udpSocket.getLocalPort();
+                "ip=" + peer.getIp() +
+                ":port=" + peer.getPort();
 
         byte[] data = message.getBytes();
         DatagramPacket packet = new DatagramPacket(data, data.length,

@@ -6,6 +6,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,7 +32,9 @@ public class Screen extends JFrame {
     private JButton btnAddMask;
     private JButton btnDelMask;
 
-    private JList<String> downloadingFilesList;
+    protected DefaultListModel<FileDTO> downloadFilesModel;
+    private JList<FileDTO> downloadingFilesList;
+
     protected DefaultListModel<FileDTO> foundFilesModel;
     private JList<FileDTO> foundFilesList;
 
@@ -259,8 +262,12 @@ public class Screen extends JFrame {
         JPanel downloadingPanel = new JPanel(new BorderLayout());
         downloadingPanel.setBorder(BorderFactory.createTitledBorder("Downloading files"));
 
-        downloadingFilesList = new JList<>(new DefaultListModel<>());
+        downloadFilesModel = new DefaultListModel<>();
+        downloadingFilesList = new JList<>(downloadFilesModel);
         downloadingPanel.add(new JScrollPane(downloadingFilesList), BorderLayout.CENTER);
+
+        startMonitoringDownloadedFiles();
+        selectFileToOpen();
 
         gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 3; gbc.weightx = 1.0; gbc.weighty = 0.3; gbc.fill = GridBagConstraints.BOTH;
 
@@ -306,6 +313,71 @@ public class Screen extends JFrame {
         foundPanel.add(searchPanel, BorderLayout.SOUTH);
     }
 
+    private void startMonitoringDownloadedFiles() {
+        Timer timer = new Timer(1000, e -> updateDownloadingFilesList());
+        timer.start();
+    }
+
+    private void updateDownloadingFilesList() {
+        HashMap<String, FileDTO> downloadedFiles = NetworkManager.getInstance().getPeer().getDownloadedFiles();
+
+        // Add new files
+        for (String file : downloadedFiles.keySet()) {
+            if (!downloadFilesModel.contains(downloadedFiles.get(file))) {
+                System.out.println("\nAdding file: " + downloadedFiles.get(file));
+                downloadFilesModel.addElement(downloadedFiles.get(file));
+            }
+        }
+
+        // Remove files that are no longer shared
+        for (int i = 0; i < downloadFilesModel.size(); i++) {
+            FileDTO fileInModel = downloadFilesModel.get(i);
+            if (!downloadedFiles.containsKey(fileInModel.hash())) {
+                downloadFilesModel.remove(i);
+                continue;
+            }
+
+            if(downloadedFiles.containsKey(fileInModel.hash()) && !downloadedFiles.get(fileInModel.hash()).filename().equals(fileInModel.filename())){
+                downloadFilesModel.set(i, downloadedFiles.get(fileInModel.hash()));
+            }
+        }
+    }
+
+    private void openFile(String path){
+        try {
+            System.out.println(path);
+            File file = new File(path);
+            if (!file.exists()) {
+                System.err.println("File does not exist: " + path);
+                return;
+            }
+
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().open(file);
+            } else {
+                System.err.println("Desktop is not supported on this system.");
+            }
+        } catch (IOException e) {
+            System.err.println("Error opening the file: " + e.getMessage());
+        }
+    }
+
+    private void selectFileToOpen(){
+        downloadingFilesList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int index = downloadingFilesList.locationToIndex(e.getPoint());
+                    if (index >= 0) {
+                        FileDTO selectedFile = downloadingFilesList.getModel().getElementAt(index);
+                        String fullPath = FileManager.getInstance().getDestinationFolder() + File.separator + selectedFile.filename();
+                        openFile(fullPath);
+                    }
+                }
+            }
+        });
+    }
+
     private void startMonitoringPeerFiles() {
         Timer timer = new Timer(1000, e -> updateFoundFilesList());
         timer.start();
@@ -341,6 +413,12 @@ public class Screen extends JFrame {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
+
+                    if (FileManager.getInstance().getDestinationFolder() == null) {
+                        JOptionPane.showMessageDialog(null, "Please set the destination folder first.", "Error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+
                     int index = foundFilesList.locationToIndex(e.getPoint());
                     if (index >= 0) {
                         FileDTO selectedFile = foundFilesList.getModel().getElementAt(index);

@@ -2,6 +2,7 @@ package src;
 
 import src.dto.FileDTO;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.*;
 
@@ -53,6 +54,7 @@ public class DownloadManager {
         try {
             FileManager.getInstance().mergeChunk(file.hash(), totalChunks);
             NetworkManager.getInstance().getPeer().addDownloadedFiles(file.hash(), file);
+            deleteChunkFiles(file.hash());
 
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -96,6 +98,26 @@ public class DownloadManager {
             throw new RuntimeException("IO error while requesting chunk " + index, e);
         } catch (InterruptedException e) {
             throw new RuntimeException("Thread interrupted while requesting chunk " + index, e);
+        }
+
+    }
+
+    private void deleteChunkFiles(String fileHash) {
+        String dirPath = FileManager.getInstance().getDestinationFolder() + File.separator + FileManager.getInstance().CHUNK_FOLDER;
+        File dir = new File(dirPath);
+
+        if (!dir.exists() || !dir.isDirectory()) {
+            return;
+        }
+
+        File[] files = dir.listFiles((_, name) -> name.startsWith(fileHash));
+
+        if (files == null) {
+            return;
+        }
+
+        for (File file : files) {
+            file.delete();
         }
 
     }
