@@ -1,4 +1,7 @@
-package src;
+package src.manager;
+
+import src.Peer;
+import src.Screen;
 
 import javax.swing.*;
 import java.net.InetAddress;

@@ -1,4 +1,4 @@
-package src;
+package src.manager;
 
 import src.dto.FileDTO;
 import src.dto.PeerDTO;
@@ -32,7 +32,7 @@ public class FileManager {
         return Arrays.asList(files);
     }
 
-    protected byte[] getChunkData(String filehash, int chunkIndex) throws IOException {
+    public byte[] getChunkData(String filehash, int chunkIndex) throws IOException {
         File file;
 
         if (NetworkManager.getInstance().getPeer().getUploadedFiles().containsKey(filehash)) {
@@ -76,7 +76,7 @@ public class FileManager {
         return chunkData;
     }
 
-    protected void saveChunkData(String fileHash, String chunkHash, int chunkIndex, byte[] chunkData) throws IOException {
+    public void saveChunkData(String fileHash, String chunkHash, int chunkIndex, byte[] chunkData) throws IOException {
         try {
             String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + chunkIndex;
             File chunkFile  = new File(fullPath);
@@ -197,7 +197,7 @@ public class FileManager {
                 ":ip=" + file.owner().ip() +
                 ":port=" + file.owner().port();
 
-        NetworkManager.getInstance().sendFileNotification(message);
+        NetworkManager.getInstance().getBroadcastSocketHandler().sendFileNotification(message);
     }
 
     private void sendFileNotification(File file, String event) throws Exception {
@@ -211,7 +211,7 @@ public class FileManager {
                 ":ip=" + getOwner().ip() +
                 ":port=" + getOwner().port();
 
-        NetworkManager.getInstance().sendFileNotification(message);
+        NetworkManager.getInstance().getBroadcastSocketHandler().sendFileNotification(message);
 
         FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
         NetworkManager.getInstance().getPeer().addUploadedFiles(getHash(file), newFile);

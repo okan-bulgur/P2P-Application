@@ -9,11 +9,11 @@ import java.util.HashSet;
 public class Peer {
     private final String ip;
     private final int port;
-    private HashMap<String, String[]> ownedChunks; // hash of file, list of chunk's hash
-    private HashSet<PeerDTO> peers;
-    private HashMap<String, FileDTO> files;
-    private HashMap<String, FileDTO> uploadedFiles;
-    private HashMap<String, FileDTO> downloadedFiles;
+    private final HashMap<String, String[]> ownedChunks; // hash of file, list of chunk's hash
+    private final HashSet<PeerDTO> peers;
+    private final HashMap<String, FileDTO> files;
+    private final HashMap<String, FileDTO> uploadedFiles;
+    private final HashMap<String, FileDTO> downloadedFiles;
 
     public Peer(String ip, int port) {
         this.ip = ip;

@@ -1,6 +1,9 @@
 package src;
 
 import src.dto.FileDTO;
+import src.manager.DownloadManager;
+import src.manager.FileManager;
+import src.manager.NetworkManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -154,6 +157,12 @@ public class Screen extends JFrame {
         mainPanel.add(sharedFolderPanel, gbc);
 
         btnSetRoot.addActionListener(e -> {
+
+            if (!NetworkManager.getInstance().isConnected()) {
+                JOptionPane.showMessageDialog(null, "Please First Connect", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
             JFileChooser fileChooser = new JFileChooser();
             fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             fileChooser.setAcceptAllFileFilterUsed(false);

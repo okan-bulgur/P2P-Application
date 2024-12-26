@@ -1,4 +1,4 @@
-package src;
+package src.manager;
 
 import src.dto.FileDTO;
 
@@ -22,7 +22,7 @@ public class DownloadManager {
         this.downloadExecutor = Executors.newFixedThreadPool(5);
     }
 
-    protected void downloadFile(FileDTO file){
+    public void downloadFile(FileDTO file){
         System.out.println("\nDownloading file: " + file);
 
         int totalChunks = file.chunkCount();
@@ -63,9 +63,9 @@ public class DownloadManager {
 
     private void downloadChunk(FileDTO file, int index) {
         try {
-            int maxRetries = 3; // Maksimum tekrar sayısı
-            int retryDelay = 1000; // Her istek arasında bekleme süresi (ms)
-            int timeout = 5000; // Chunk bekleme süresi (ms)
+            int maxRetries = 3;
+            int retryDelay = 1000;
+            int timeout = 5000;
 
             boolean chunkReceived = false;
             int attempts = 0;
@@ -74,7 +74,7 @@ public class DownloadManager {
                 attempts++;
                 System.out.println("\nRequesting chunk " + index + " (Attempt " + attempts + ")");
 
-                NetworkManager.getInstance().sendChunkRequest(file.hash(), index);
+                NetworkManager.getInstance().getUdpSocketHandler().sendChunkRequest(file.hash(), index);
 
                 long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime < timeout) {
