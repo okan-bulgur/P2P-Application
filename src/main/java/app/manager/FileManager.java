@@ -1,7 +1,7 @@
-package src.manager;
+package app.manager;
 
-import src.dto.FileDTO;
-import src.dto.PeerDTO;
+import app.dto.FileDTO;
+import app.dto.PeerDTO;
 
 import java.io.*;
 import java.nio.file.*;

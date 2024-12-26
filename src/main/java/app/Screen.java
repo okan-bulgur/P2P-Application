@@ -1,9 +1,9 @@
-package src;
+package app;
 
-import src.dto.FileDTO;
-import src.manager.DownloadManager;
-import src.manager.FileManager;
-import src.manager.NetworkManager;
+import app.dto.FileDTO;
+import app.manager.DownloadManager;
+import app.manager.FileManager;
+import app.manager.NetworkManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -106,7 +106,7 @@ public class Screen extends JFrame {
             JOptionPane.showMessageDialog(this, "P2P File Sharing Application\n\nOkan Bulgur\n20200702017", "About", JOptionPane.INFORMATION_MESSAGE);
         });
 
-        JMenuItem addManuelPeer = new JMenuItem("Add Manuel Peer");
+        JMenuItem addManuelPeer = new JMenuItem("Add Manuel app.Peer");
         menuFiles.add(addManuelPeer);
         addManuelPeer.addActionListener(e -> {
             String ip = JOptionPane.showInputDialog("Enter IP Address:");

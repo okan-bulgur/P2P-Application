@@ -1,6 +1,6 @@
-package src.manager;
+package app.manager;
 
-import src.dto.FileDTO;
+import app.dto.FileDTO;
 
 import java.io.File;
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package src.socket;
+package app.socket;
 
 import java.io.IOException;
 import java.net.DatagramPacket;

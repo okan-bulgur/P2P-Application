@@ -1,7 +1,7 @@
-package src;
+package app;
 
-import src.dto.FileDTO;
-import src.dto.PeerDTO;
+import app.dto.FileDTO;
+import app.dto.PeerDTO;
 
 import java.util.HashMap;
 import java.util.HashSet;

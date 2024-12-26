@@ -1,4 +1,4 @@
-package src.dto;
+package app.dto;
 
 import java.util.Objects;
 

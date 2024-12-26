@@ -1,19 +1,16 @@
-package src.manager;
+package app.manager;
 
-import src.Peer;
-import src.dto.PeerDTO;
-import src.socket.BroadcastSocketHandler;
-import src.socket.UdpSocketHandler;
+import app.Peer;
+import app.dto.PeerDTO;
+import app.socket.BroadcastSocketHandler;
+import app.socket.UdpSocketHandler;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
+import java.net.*;
 
 public class NetworkManager {
     private static NetworkManager instance;
-    private Peer peer;
+    private app.Peer peer;
 
     private DatagramSocket udpSocket;
     private boolean isConnected = false;
@@ -23,6 +20,8 @@ public class NetworkManager {
     private boolean isBroadcastConnected = false;
     private Thread listenerThreadForBroadcast;
 
+    static final int APP_PORT = 5000;
+
     final String BROADCAST_IP = "255.255.255.255";
     final int BROADCAST_PORT = 5050;
 
@@ -31,7 +30,12 @@ public class NetworkManager {
 
     public static synchronized NetworkManager getInstance() {
         if (instance == null) {
-            instance = new NetworkManager();
+            try {
+                instance = new NetworkManager();
+                instance.setPeer(new Peer(InetAddress.getLocalHost().getHostAddress(), APP_PORT));
+            } catch (UnknownHostException e) {
+                throw new RuntimeException(e);
+            }
         }
         return instance;
     }
@@ -131,11 +135,11 @@ public class NetworkManager {
         return new PeerDTO(peer.getIp(), peer.getPort());
     }
 
-    public Peer getPeer() {
+    public app.Peer getPeer() {
         return peer;
     }
 
-    protected void setPeer(Peer peer) {
+    public void setPeer(app.Peer peer) {
         this.peer = peer;
     }
 
@@ -155,7 +159,7 @@ public class NetworkManager {
         PeerDTO newPeer = new PeerDTO(ip, port);
         peer.addPeer(newPeer);
 
-        System.out.println("Peer added: " + newPeer.ip() + ":" + newPeer.port());
+        System.out.println("app.Peer added: " + newPeer.ip() + ":" + newPeer.port());
     }
 
     public void showPeers() {

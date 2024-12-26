@@ -1,9 +1,9 @@
-package src.socket;
+package app.socket;
 
-import src.manager.FileManager;
-import src.manager.NetworkManager;
-import src.Peer;
-import src.dto.PeerDTO;
+import app.manager.FileManager;
+import app.manager.NetworkManager;
+import app.Peer;
+import app.dto.PeerDTO;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
