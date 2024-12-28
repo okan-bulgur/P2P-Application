@@ -343,4 +343,10 @@ public class FileManager {
             System.err.println("The directory is empty or cannot be accessed.");
         }
     }
+
+    public int getDownloadPercentage(FileDTO file) {
+        int totalChunks = file.chunkCount();
+        int downloadedChunks = NetworkManager.getInstance().getPeer().getDownloadedChunkCountForFile(file.hash());
+        return (int) ((downloadedChunks * 100.0) / totalChunks);
+    }
 }

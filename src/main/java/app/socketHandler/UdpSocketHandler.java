@@ -1,6 +1,5 @@
 package app.socketHandler;
 
-import app.manager.FileManager;
 import app.manager.NetworkManager;
 import app.Peer;
 import app.dto.PeerDTO;
@@ -54,13 +53,13 @@ public class UdpSocketHandler {
             visitedInfo.append(v.ip()).append(":").append(v.port()).append(",");
         }
 
-        String message = "CHUNK_REQUEST:" +
-                "hash=" + hash +
+        String message = "CHUNK_REQUEST" +
+                ":hash=" + hash +
                 ":index=" + index +
-                "ip=" + requesterIP + ":" +
-                "port=" + requesterPort + ":" +
-                "ttl=" + ttl + ":" +
-                "visited=" + (!visited.isEmpty() ? visitedInfo.substring(0, visitedInfo.length() - 1) : "");
+                ":ip=" + requesterIP +
+                ":port=" + requesterPort +
+                ":ttl=" + ttl +
+                ":visited=" + (!visited.isEmpty() ? visitedInfo.substring(0, visitedInfo.length() - 1) : "");
 
         byte[] data = message.getBytes();
 
@@ -75,13 +74,13 @@ public class UdpSocketHandler {
     }
 
     public void sendChunkRequest(String hash, int index) throws IOException { // CHUNK_REQUEST:hash=x:index:xip=x.x.x.x:port=xxxx:ttl=x:visited=ip:port,...
-        String message = "CHUNK_REQUEST:" +
-                "hash=" + hash +
+        String message = "CHUNK_REQUEST" +
+                ":hash=" + hash +
                 ":index=" + index +
                 ":ip=" + peer.getIp() +
                 ":port=" + peer.getPort() +
-                ":ttl=" + MAX_TTL + ":" +
-                "visited=" + peer.getIp() + ":" + peer.getPort();
+                ":ttl=" + MAX_TTL +
+                ":visited=" + peer.getIp() + ":" + peer.getPort();
 
         byte[] data = message.getBytes();
 

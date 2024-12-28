@@ -330,7 +330,6 @@ public class Screen extends JFrame {
     private void updateDownloadingFilesList() {
         HashMap<String, FileDTO> downloadedFiles = NetworkManager.getInstance().getPeer().getDownloadedFiles();
 
-        // Add new files
         for (String file : downloadedFiles.keySet()) {
             if (!downloadFilesModel.contains(downloadedFiles.get(file))) {
                 System.out.println("\nAdding file: " + downloadedFiles.get(file));
@@ -338,7 +337,6 @@ public class Screen extends JFrame {
             }
         }
 
-        // Remove files that are no longer shared
         for (int i = 0; i < downloadFilesModel.size(); i++) {
             FileDTO fileInModel = downloadFilesModel.get(i);
             if (!downloadedFiles.containsKey(fileInModel.hash())) {
@@ -442,14 +440,53 @@ public class Screen extends JFrame {
                             return;
                         }
 
-                        try {
-                            DownloadManager.getInstance().downloadFile(selectedFile);
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        }
+                        JDialog progressDialog = new JDialog((Frame) null, "Downloading: " + selectedFile.filename(), false);
+                        progressDialog.setSize(400, 100);
+                        progressDialog.setLayout(new BorderLayout());
+
+                        JLabel fileLabel = new JLabel("Downloading: " + selectedFile.filename());
+                        JProgressBar downloadProgressBar = new JProgressBar(0, 100);
+                        downloadProgressBar.setValue(0);
+                        downloadProgressBar.setStringPainted(true);
+
+                        progressDialog.add(fileLabel, BorderLayout.NORTH);
+                        progressDialog.add(downloadProgressBar, BorderLayout.CENTER);
+                        progressDialog.setLocationRelativeTo(null);
+                        progressDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+                        SwingUtilities.invokeLater(() -> progressDialog.setVisible(true));
+
+                        Thread downloadThread = new Thread(() -> {
+                            try {
+                                DownloadManager.getInstance().downloadFile(selectedFile);
+                            } catch (IOException ex) {
+                                JOptionPane.showMessageDialog(null, "Error downloading file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                            }
+                        });
+
+                        Thread progressThread = new Thread(() -> updateProgressBar(selectedFile, progressDialog, downloadProgressBar));
+
+                        downloadThread.start();
+                        progressThread.start();
                     }
                 }
             }
         });
+    }
+
+    private void updateProgressBar(FileDTO file, JDialog progressDialog, JProgressBar downloadProgressBar) {
+        while (true) {
+            int percentage = FileManager.getInstance().getDownloadPercentage(file);
+            SwingUtilities.invokeLater(() -> downloadProgressBar.setValue(percentage));
+            if (percentage >= 100) {
+                progressDialog.dispose();
+                break;
+            }
+
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException interruptedException) {
+                System.err.println("Error updating progress bar: " + interruptedException.getMessage());
+            }
+        }
     }
 }

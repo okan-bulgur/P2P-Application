@@ -12,9 +12,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY target/P2P-Application-1.0-SNAPSHOT.jar /app/app.jar
-COPY src/main/java/app/res/CSE462TP.pdf /app/source/CSE462TP.pdf
-COPY src/main/java/app/res/CSE471TP.pdf /app/source/CSE471TP.pdf
-COPY src/main/java/app/res/tarkanMusic.mp3 /app/source/tarkanMusic.mp3
+COPY src/main/java/app/res/pdf1.pdf /app/source/pdf1.pdf
+COPY src/main/java/app/res/pdf2.pdf /app/source/pdf2.pdf
+COPY src/main/java/app/res/music1.mp4 /app/source/music1.mp4
+COPY src/main/java/app/res/music2.mp3 /app/source/music2.mp3
+COPY src/main/java/app/res/video1.mp4 /app/source/video1.mp4
+COPY src/main/java/app/res/img1.jpg /app/source/img1.jpg
+
 RUN mkdir -p /app/dest
 
 ENV DISPLAY=host.docker.internal:0.0

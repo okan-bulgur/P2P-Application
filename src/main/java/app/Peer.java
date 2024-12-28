@@ -47,6 +47,19 @@ public class Peer {
         return !ownedChunks.get(fileHash)[chunkIndex].isEmpty();
     }
 
+    public int getDownloadedChunkCountForFile(String fileHash) {
+        if (!ownedChunks.containsKey(fileHash)) {
+            return 0;
+        }
+        int count = 0;
+        for (String chunk : ownedChunks.get(fileHash)) {
+            if (!chunk.isEmpty()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public void addPeer(PeerDTO peer) {
         peers.add(peer);
     }

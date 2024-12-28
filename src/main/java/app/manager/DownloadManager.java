@@ -59,7 +59,7 @@ public class DownloadManager {
         try {
             int maxRetries = 3;
             int retryDelay = 1000;
-            int timeout = 5000;
+            int timeout = 10000;
 
             int attempts = 0;
 
