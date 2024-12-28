@@ -1,5 +1,6 @@
 package app.socketHandler;
 
+import app.dto.FileDTO;
 import app.manager.NetworkManager;
 import app.Peer;
 import app.dto.PeerDTO;
@@ -20,6 +21,7 @@ public class UdpSocketHandler {
     private final ExecutorService requestExecutor;
 
     final int MAX_TTL = 3;
+    static boolean isSentFileRequest = false;
 
     public UdpSocketHandler(DatagramSocket udpSocket) {
         this.udpSocket = udpSocket;
@@ -37,9 +39,17 @@ public class UdpSocketHandler {
         else if (message.startsWith("FRIEND_REQUEST")) { // FRIEND_REQUEST
             friendRequestHandler(packet);
         }
+        else if (message.startsWith("FILE_NOTIFICATION")) { // FILE_NOTIFICATION:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
+            fileNotificationHandler(packet);
+        }
+        else if (message.startsWith("FILE_INFO_REQUEST")) { // FILE_INFO_REQUEST
+            sendFilesInfoForNewPeer(new PeerDTO(packet.getAddress().getHostAddress(), packet.getPort()));
+        }
     }
 
     protected void spreadChunkRequest(String hash, int index, String requesterIP, int requesterPort, int ttl, HashSet<PeerDTO> visited) throws IOException {
+        System.out.println("Spreading chunk request for: " + hash + " index: " + index + " ttl: " + ttl);
+
         peer.addPeer(new PeerDTO(requesterIP, requesterPort));
         NetworkManager.getInstance().getUdpSocketHandler().sendFriendRequest(requesterIP, requesterPort);
 
@@ -173,6 +183,78 @@ public class UdpSocketHandler {
 
         PeerDTO newPeer = new PeerDTO(ip, port);
         peer.addPeer(newPeer);
+
+        if (!isSentFileRequest) {
+            isSentFileRequest = true;
+            sendFileRequest(newPeer);
+        }
+    }
+
+    private void fileNotificationHandler(DatagramPacket packet) throws IOException { // FILE_NOTIFICATION:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
+        String message = new String(packet.getData(), 0, packet.getLength()).trim();
+
+        String[] parts = message.split(":");
+        String filename = parts[1].split("=")[1];
+        String fileType = parts[2].split("=")[1];
+        int fileSize = Integer.parseInt(parts[3].split("=")[1]);
+        int chunkCount = Integer.parseInt(parts[4].split("=")[1]);
+        String hash = parts[5].split("=")[1];
+        String ip = parts[6].split("=")[1];
+        int port = Integer.parseInt(parts[7].split("=")[1]);
+
+        if (peer.getFiles().containsKey(hash) || peer.getUploadedFiles().containsKey(hash)) {
+            return;
+        }
+
+        FileDTO file = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port));
+
+        peer.addFiles(hash, file);
+    }
+
+    private void sendFilesInfoForNewPeer(PeerDTO requesterPeer) throws IOException {
+        for (String fileHash : peer.getUploadedFiles().keySet()) {
+            String notify = "filename=" + peer.getUploadedFiles().get(fileHash).filename() +
+                    ":fileType=" + peer.getUploadedFiles().get(fileHash).fileType() +
+                    ":fileSize=" + peer.getUploadedFiles().get(fileHash).fileSize() +
+                    ":chunkCount=" + peer.getUploadedFiles().get(fileHash).chunkCount() +
+                    ":hash=" + fileHash +
+                    ":ip=" + peer.getUploadedFiles().get(fileHash).owner().ip() +
+                    ":port=" + peer.getUploadedFiles().get(fileHash).owner().port();
+
+            sendFileNotification(notify, requesterPeer);
+        }
+
+        for (String fileHash : peer.getFiles().keySet()) {
+            String notify = "filename=" + peer.getFiles().get(fileHash).filename() +
+                    ":fileType=" + peer.getFiles().get(fileHash).fileType() +
+                    ":fileSize=" + peer.getFiles().get(fileHash).fileSize() +
+                    ":chunkCount=" + peer.getFiles().get(fileHash).chunkCount() +
+                    ":hash=" + fileHash +
+                    ":ip=" + peer.getFiles().get(fileHash).owner().ip() +
+                    ":port=" + peer.getFiles().get(fileHash).owner().port();
+
+            sendFileNotification(notify, requesterPeer);
+        }
+    }
+
+    private void sendFileNotification(String notify, PeerDTO peer) throws IOException { // FILE_NOTIFICATION:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
+
+        String message = "FILE_NOTIFICATION:" + notify;
+
+        byte[] data = message.getBytes();
+
+        System.out.println("Sending file notification: (" + message + ")");
+
+        sendPacket(data, peer.ip(), peer.port());
+    }
+
+    protected void sendFileRequest(PeerDTO peer) throws IOException {
+        String message = "FILE_INFO_REQUEST";
+        byte[] data = message.getBytes();
+
+        System.out.println("Sending file info request to: " + peer.ip() + ":" + peer.port());
+
+        sendPacket(data, peer.ip(), peer.port());
     }
 
     public DatagramSocket getSocket() {

@@ -15,9 +15,7 @@ public class TcpSocketHandler {
 
     public void processResponse(Socket clientSocket) throws Exception {
         DataInputStream dis = new DataInputStream(clientSocket.getInputStream());
-
         chunkResultHandler(dis);
-
     }
 
     public void sendChunk(String fileHash, int index, String ip, int port) throws IOException {

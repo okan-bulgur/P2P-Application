@@ -97,6 +97,9 @@ public class BroadcastSocketHandler {
         FileDTO fileDTO = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port));
 
         if (event.equals("ENTRY_CREATE")) {
+            if (peer.getUploadedFiles().containsKey(fileDTO.hash())) {
+                return;
+            }
             peer.addFiles(fileDTO.hash(), fileDTO);
         }
         else if (event.equals("ENTRY_DELETE")) {
