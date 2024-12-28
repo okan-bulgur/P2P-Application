@@ -1,14 +1,17 @@
 package app.manager;
 
+import app.Screen;
 import app.dto.FileDTO;
 import app.dto.PeerDTO;
 
+import javax.swing.*;
 import java.io.*;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class FileManager {
     final int CHUNK_SIZE = 256 * 1024;
@@ -165,7 +168,9 @@ public class FileManager {
 
                         File file = fullPath.toFile();
 
-                        sendFileNotification(file, event.kind().name());
+                        if (!isFileExclude(file)) {
+                            sendFileNotification(file, event.kind().name());
+                        }
 
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -307,6 +312,9 @@ public class FileManager {
         try {
             for (File file : listSharedFiles()) {
                 sendFileNotification(file, "ENTRY_CREATE");
+                if (isFileExclude(file)) {
+                    sendFileNotification(file, "ENTRY_DELETE");
+                }
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -348,5 +356,19 @@ public class FileManager {
         int totalChunks = file.chunkCount();
         int downloadedChunks = NetworkManager.getInstance().getPeer().getDownloadedChunkCountForFile(file.hash());
         return (int) ((downloadedChunks * 100.0) / totalChunks);
+    }
+
+    private boolean isFileExclude(File file) {
+        DefaultListModel<String> model = (DefaultListModel<String>) Screen.getInstance().excludeMasksList.getModel();
+        List<String> excludeMasksList = Collections.list(model.elements());
+
+        for (String regex : excludeMasksList) {
+            regex = regex.replace(".", "\\.").replace("*", ".*");
+            if (Pattern.matches(regex, file.getName())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

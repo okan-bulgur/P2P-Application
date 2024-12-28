@@ -4,6 +4,7 @@ import app.dto.FileDTO;
 import app.manager.DownloadManager;
 import app.manager.FileManager;
 import app.manager.NetworkManager;
+import app.socketHandler.BroadcastSocketHandler;
 
 import javax.swing.*;
 import java.awt.*;
@@ -11,8 +12,10 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 public class Screen extends JFrame {
     private static Screen instance;
@@ -27,11 +30,11 @@ public class Screen extends JFrame {
 
     private JCheckBox chkOnlyRoot;
 
-    private JList<String> excludeFoldersList;
+    public JList<String> excludeFoldersList;
     private JButton btnAddFolder;
     private JButton btnDelFolder;
 
-    private JList<String> excludeMasksList;
+    public JList<String> excludeMasksList;
     private JButton btnAddMask;
     private JButton btnDelMask;
 
@@ -248,7 +251,6 @@ public class Screen extends JFrame {
     }
 
     private void setupMaskExclusionPanel(JPanel settingsPanel, GridBagConstraints sgbc){
-        // Exclude files matching these masks
         JPanel maskPanel = new JPanel(new BorderLayout());
         maskPanel.setBorder(BorderFactory.createTitledBorder("Exclude files matching these masks"));
         excludeMasksList = new JList<>(new DefaultListModel<>());
@@ -264,10 +266,55 @@ public class Screen extends JFrame {
         sgbc.gridx = 1; sgbc.gridy = 1; sgbc.gridwidth = 1; sgbc.weightx = 0.5; sgbc.weighty = 1.0; sgbc.fill = GridBagConstraints.BOTH;
 
         settingsPanel.add(maskPanel, sgbc);
+
+        btnAddMask.addActionListener(e -> {
+            String mask = JOptionPane.showInputDialog("Enter the mask to exclude:");
+            if (mask == null) return;
+            if (mask.isEmpty()) return;
+
+            DefaultListModel<String> model = (DefaultListModel<String>) excludeMasksList.getModel();
+            model.addElement(mask);
+
+            mask = mask.replace(".", "\\.").replace("*", ".*");
+            for (FileDTO file : NetworkManager.getInstance().getPeer().getUploadedFiles().values()){
+                if (Pattern.matches(mask, file.filename())){
+                    try {
+                        String notify = "event=ENTRY_DELETE:filename=" + file.filename() + ":fileType=" + file.fileType() + ":fileSize=" + file.fileSize() + ":chunkCount=" + file.chunkCount() + ":hash=" + file.hash() + ":ip=" + NetworkManager.getInstance().getPeer().getIp() + ":port=" + NetworkManager.getInstance().getPeer().getPort();
+                        NetworkManager.getInstance().getBroadcastSocketHandler().sendFileNotification(notify);
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+
+        });
+
+        btnDelMask.addActionListener(e -> {
+            DefaultListModel<String> model = (DefaultListModel<String>) excludeMasksList.getModel();
+            int index = excludeMasksList.getSelectedIndex();
+
+            String mask = model.getElementAt(index);
+            mask = mask.replace(".", "\\.").replace("*", ".*");
+
+            for (FileDTO file : NetworkManager.getInstance().getPeer().getUploadedFiles().values()){
+                if (Pattern.matches(mask, file.filename())){
+                    try {
+                        String notify = "event=ENTRY_CREATE:filename=" + file.filename() + ":fileType=" + file.fileType() + ":fileSize=" + file.fileSize() + ":chunkCount=" + file.chunkCount() + ":hash=" + file.hash() + ":ip=" + NetworkManager.getInstance().getPeer().getIp() + ":port=" + NetworkManager.getInstance().getPeer().getPort();
+                        NetworkManager.getInstance().getBroadcastSocketHandler().sendFileNotification(notify);
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+
+            if (index != -1) {
+                model.remove(index);
+            }
+
+        });
     }
 
     private void setupDownloadingPanel(){
-        // Downloading files
         JPanel downloadingPanel = new JPanel(new BorderLayout());
         downloadingPanel.setBorder(BorderFactory.createTitledBorder("Downloading files"));
 
@@ -284,8 +331,6 @@ public class Screen extends JFrame {
     }
 
     private void setupFoundFilesPanel(){
-        // Found files
-
         JPanel foundPanel = new JPanel(new BorderLayout());
         foundPanel.setBorder(BorderFactory.createTitledBorder("Found files"));
 
@@ -304,8 +349,6 @@ public class Screen extends JFrame {
     }
 
     private void setupSearchPanel(JPanel foundPanel){
-        // Search
-
         JPanel searchPanel = new JPanel(new GridBagLayout());
 
         GridBagConstraints sgbc = new GridBagConstraints();
@@ -412,7 +455,6 @@ public class Screen extends JFrame {
     private void updateFoundFilesList() {
         HashMap<String, FileDTO> peerFiles = NetworkManager.getInstance().getPeer().getFiles();
 
-        // Add new files
         for (String file : peerFiles.keySet()) {
             if (!foundFilesModel.contains(peerFiles.get(file))) {
                 System.out.println("Adding file: " + peerFiles.get(file));
@@ -420,7 +462,6 @@ public class Screen extends JFrame {
             }
         }
 
-        // Remove files that are no longer shared
         for (int i = 0; i < foundFilesModel.size(); i++) {
             FileDTO fileInModel = foundFilesModel.get(i);
             if (!peerFiles.containsKey(fileInModel.hash())) {

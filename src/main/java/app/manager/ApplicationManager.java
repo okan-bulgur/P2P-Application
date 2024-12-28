@@ -13,7 +13,7 @@ public class ApplicationManager {
 
         SwingUtilities.invokeLater(() -> {
             try {
-                Screen screen = new Screen();
+                Screen screen = Screen.getInstance();
                 screen.setVisible(true);
             } catch (Exception e) {
                 e.printStackTrace();
