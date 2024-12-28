@@ -320,6 +320,25 @@ public class Screen extends JFrame {
         searchPanel.add(btnSearch, sgbc);
 
         foundPanel.add(searchPanel, BorderLayout.SOUTH);
+
+        btnSearch.addActionListener(e -> {
+            String search = txtSearch.getText();
+
+            DefaultListModel<FileDTO> searchResults = new DefaultListModel<>();
+            for (int i = 0; i < foundFilesModel.size(); i++) {
+                FileDTO file = foundFilesModel.get(i);
+                if (file.filename().contains(search)) {
+                    searchResults.addElement(file);
+                }
+            }
+
+            if (searchResults.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "No files found.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            foundFilesList.setModel(searchResults);
+        });
     }
 
     private void startMonitoringDownloadedFiles() {

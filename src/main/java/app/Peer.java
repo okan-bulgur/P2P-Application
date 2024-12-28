@@ -9,7 +9,7 @@ import java.util.HashSet;
 public class Peer {
     private final String ip;
     private final int port;
-    private final HashMap<String, String[]> ownedChunks; // hash of file, list of chunk's hash
+    private final HashMap<String, String[]> ownedChunks;
     private final HashSet<PeerDTO> peers;
     private final HashMap<String, FileDTO> files;
     private final HashMap<String, FileDTO> uploadedFiles;
