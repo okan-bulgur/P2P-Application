@@ -437,8 +437,16 @@ public class Screen extends JFrame {
                             Arrays.fill(chunks, "");
                             NetworkManager.getInstance().getPeer().getOwnedChunks().put(selectedFile.hash(), chunks);
                         }
+                        else {
+                            System.out.println("Chunks already exist for file: " + selectedFile);
+                            return;
+                        }
 
-                        DownloadManager.getInstance().downloadFile(selectedFile);
+                        try {
+                            DownloadManager.getInstance().downloadFile(selectedFile);
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex);
+                        }
                     }
                 }
             }

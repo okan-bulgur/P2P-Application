@@ -1,4 +1,4 @@
-package app.socket;
+package app.socketHandler;
 
 import app.manager.NetworkManager;
 import app.Peer;
@@ -10,7 +10,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 
-public class BroadcastSocketHandler implements SocketHandler {
+public class BroadcastSocketHandler {
 
     final private Peer peer = NetworkManager.getInstance().getPeer();
     final private String BROADCAST_IP;
@@ -48,7 +48,7 @@ public class BroadcastSocketHandler implements SocketHandler {
         System.out.println("Bootstrap request sent to: " + BROADCAST_IP + ":" + BROADCAST_PORT + " (" + message + ")");
     }
 
-    public void sendFileNotification(String notify) throws IOException { // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x
+    public void sendFileNotification(String notify) throws IOException { // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
 
         String message = "FILE_NOTIFICATION:" + notify;
 
@@ -77,7 +77,7 @@ public class BroadcastSocketHandler implements SocketHandler {
         peer.addPeer(newPeer);
     }
 
-    private void fileNotificationHandler(DatagramPacket packet) throws IOException{ // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x
+    private void fileNotificationHandler(DatagramPacket packet) throws IOException{ // FILE_NOTIFICATION:event=x:filename=x:fileType=x:fileSize=x:chunkCount=x:hash=x:ip=x.x.x.x:port=xxxx
         String message = new String(packet.getData(), 0, packet.getLength()).trim();
 
         String[] parts = message.split(":");
@@ -87,8 +87,8 @@ public class BroadcastSocketHandler implements SocketHandler {
         long fileSize = Long.parseLong(parts[4].split("=")[1]);
         int chunkCount = Integer.parseInt(parts[5].split("=")[1]);
         String hash = parts[6].split("=")[1];
-        String ip = packet.getAddress().getHostAddress();
-        int port = packet.getPort();
+        String ip = parts[7].split("=")[1];
+        int port = Integer.parseInt(parts[8].split("=")[1]);
 
         if (InetAddress.getByName(peer.getIp()).getHostAddress().equals(ip) && peer.getPort() == port) {
             return;
@@ -104,6 +104,16 @@ public class BroadcastSocketHandler implements SocketHandler {
         }
 
         peer.addPeer(fileDTO.owner());
+    }
+
+    private void sendPacket(byte [] data, String ip, int port) throws IOException {
+        DatagramPacket packet = new DatagramPacket(
+                data,
+                data.length,
+                InetAddress.getByName(ip),
+                port
+        );
+        getSocket().send(packet);
     }
 
     public DatagramSocket getSocket() {

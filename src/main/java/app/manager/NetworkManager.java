@@ -2,8 +2,9 @@ package app.manager;
 
 import app.Peer;
 import app.dto.PeerDTO;
-import app.socket.BroadcastSocketHandler;
-import app.socket.UdpSocketHandler;
+import app.socketHandler.BroadcastSocketHandler;
+import app.socketHandler.TcpSocketHandler;
+import app.socketHandler.UdpSocketHandler;
 
 import java.io.IOException;
 import java.net.*;
@@ -13,26 +14,32 @@ public class NetworkManager {
     private app.Peer peer;
 
     private DatagramSocket udpSocket;
-    private boolean isConnected = false;
-    private Thread listenerThread;
+    private boolean isUdpConnected = false;
+    private Thread listenerThreadForUdp;
 
     private DatagramSocket broadcastSocket;
     private boolean isBroadcastConnected = false;
     private Thread listenerThreadForBroadcast;
 
-    static final int APP_PORT = 5000;
+    private ServerSocket tcpServerSocket;
+    private boolean isTcpConnected = false;
+    private Thread listenerThreadForTcp;
+
+    public static final int UDP_PORT = 5000;
+    public static final int TCP_PORT = 5010;
 
     final String BROADCAST_IP = "255.255.255.255";
     final int BROADCAST_PORT = 5050;
 
     private static UdpSocketHandler udpSocketHandler;
     private static BroadcastSocketHandler broadcastSocketHandler;
+    private static TcpSocketHandler tcpSocketHandler;
 
     public static synchronized NetworkManager getInstance() {
         if (instance == null) {
             try {
                 instance = new NetworkManager();
-                instance.setPeer(new Peer(InetAddress.getLocalHost().getHostAddress(), APP_PORT));
+                instance.setPeer(new Peer(InetAddress.getLocalHost().getHostAddress(), UDP_PORT));
             } catch (UnknownHostException e) {
                 throw new RuntimeException(e);
             }
@@ -42,19 +49,21 @@ public class NetworkManager {
 
     public void connect() {
 
-        if (isConnected) return;
+        if (isUdpConnected) return;
 
         try {
+            // UDP Part
             udpSocket = new DatagramSocket(peer.getPort());
-            isConnected = true;
+            isUdpConnected = true;
 
             udpSocketHandler = new UdpSocketHandler(udpSocket);
 
-            if (listenerThread == null || !listenerThread.isAlive()) {
-                listenerThread = new Thread(this::listenForUdpResponses);
-                listenerThread.start();
+            if (listenerThreadForUdp == null || !listenerThreadForUdp.isAlive()) {
+                listenerThreadForUdp = new Thread(this::listenForUdpResponses);
+                listenerThreadForUdp.start();
             }
 
+            // Broadcast Part
             broadcastSocket = new DatagramSocket(null);
             broadcastSocket.setReuseAddress(true);
             broadcastSocket.bind(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), BROADCAST_PORT));
@@ -70,6 +79,17 @@ public class NetworkManager {
 
             broadcastSocketHandler.sendBroadcastRequest();
 
+            // TCP Part
+            tcpServerSocket = new ServerSocket(TCP_PORT);
+            isTcpConnected = true;
+
+            tcpSocketHandler = new TcpSocketHandler();
+
+            if (listenerThreadForTcp == null || !listenerThreadForTcp.isAlive()) {
+                listenerThreadForTcp = new Thread(this::listenForTcpResponses);
+                listenerThreadForTcp.start();
+            }
+
             System.out.println("\nIP: " + peer.getIp() + " Port: " + peer.getPort() + " is connecting to the network.\n");
         }
         catch (IOException e) {
@@ -79,14 +99,15 @@ public class NetworkManager {
     }
 
     public void disconnect() {
-        if (!isConnected) return;
+        if (!isUdpConnected) return;
 
         udpSocketHandler = null;
         broadcastSocketHandler = null;
+        tcpSocketHandler = null;
 
-        isConnected = false;
-        if (listenerThread != null && listenerThread.isAlive()) {
-            listenerThread.interrupt();
+        isUdpConnected = false;
+        if (listenerThreadForUdp != null && listenerThreadForUdp.isAlive()) {
+            listenerThreadForUdp.interrupt();
         }
         if (udpSocket != null && !udpSocket.isClosed()) {
             udpSocket.close();
@@ -100,6 +121,18 @@ public class NetworkManager {
             broadcastSocket.close();
         }
 
+        isTcpConnected = false;
+        if (listenerThreadForTcp != null && listenerThreadForTcp.isAlive()) {
+            listenerThreadForTcp.interrupt();
+        }
+        if (tcpServerSocket != null && !tcpServerSocket.isClosed()) {
+            try {
+                tcpServerSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         peer.getPeers().clear();
 
         System.out.println("IP: " + peer.getIp() + " Port: " + peer.getPort() + " is disconnecting from the network.");
@@ -107,13 +140,13 @@ public class NetworkManager {
 
     private void listenForUdpResponses() {
         byte[] buffer = new byte[1024];
-        while (isConnected) {
+        while (isUdpConnected) {
             try {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 udpSocket.receive(packet);
                 udpSocketHandler.processResponse(packet);
             } catch (IOException e) {
-                if(!isConnected) break;
+                if(!isUdpConnected) break;
             }
         }
     }
@@ -127,6 +160,27 @@ public class NetworkManager {
                 broadcastSocketHandler.processResponse(packet);
             } catch (IOException e) {
                 if(!isBroadcastConnected) break;
+            }
+        }
+    }
+
+    private void listenForTcpResponses() {
+        while (isTcpConnected) {
+            Socket clientSocket = null;
+            try {
+                clientSocket = tcpServerSocket.accept();
+                clientSocket.setReceiveBufferSize(257 * 1024);
+                Socket finalClientSocket = clientSocket;
+                System.out.println("New TCP connection from " + finalClientSocket.getInetAddress().getHostAddress() + ":" + finalClientSocket.getPort());
+                new Thread(() -> {
+                    try {
+                        tcpSocketHandler.processResponse(finalClientSocket);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }).start();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
@@ -151,8 +205,12 @@ public class NetworkManager {
         return broadcastSocketHandler;
     }
 
+    public TcpSocketHandler getTcpSocketHandler() {
+        return tcpSocketHandler;
+    }
+
     public boolean isConnected() {
-        return isConnected;
+        return isUdpConnected;
     }
 
     public void addManuelPeer(String ip, int port) {

@@ -8,7 +8,6 @@ import java.util.concurrent.*;
 
 public class DownloadManager {
     private static DownloadManager instance;
-
     private final ExecutorService downloadExecutor;
 
     public static DownloadManager getInstance() {
@@ -19,10 +18,12 @@ public class DownloadManager {
     }
 
     public DownloadManager() {
-        this.downloadExecutor = Executors.newFixedThreadPool(5);
+        downloadExecutor = Executors.newFixedThreadPool(5);
     }
 
-    public void downloadFile(FileDTO file){
+    public void downloadFile(FileDTO file) throws IOException {
+        FileManager.getInstance().generateChunkFolder();
+
         System.out.println("\nDownloading file: " + file);
 
         int totalChunks = file.chunkCount();
@@ -36,16 +37,10 @@ public class DownloadManager {
             downloadExecutor.submit(() -> downloadChunk(file, index));
         }
 
-        while (true){
-            int count = 0;
-            for (int i = 0; i < totalChunks; i++) {
-                if (NetworkManager.getInstance().getPeer().hasChunk(file.hash(), i)) {
-                    count++;
-                }
-            }
-
-            if (count == totalChunks) {
-                break;
+        for (int i = 0; i < totalChunks; i++) {
+            if (!NetworkManager.getInstance().getPeer().hasChunk(file.hash(), i)) {
+                System.err.println("Failed to download chunk " + i + " for file: " + file.hash());
+                downloadChunk(file, i);
             }
         }
 
@@ -55,7 +50,6 @@ public class DownloadManager {
             FileManager.getInstance().mergeChunk(file.hash(), totalChunks);
             NetworkManager.getInstance().getPeer().addDownloadedFiles(file.hash(), file);
             deleteChunkFiles(file.hash());
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -67,10 +61,9 @@ public class DownloadManager {
             int retryDelay = 1000;
             int timeout = 5000;
 
-            boolean chunkReceived = false;
             int attempts = 0;
 
-            while (!chunkReceived && attempts < maxRetries) {
+            while (attempts < maxRetries) {
                 attempts++;
                 System.out.println("\nRequesting chunk " + index + " (Attempt " + attempts + ")");
 
@@ -79,21 +72,17 @@ public class DownloadManager {
                 long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime < timeout) {
                     if (NetworkManager.getInstance().getPeer().hasChunk(file.hash(), index)) {
-                        chunkReceived = true;
-                        break;
+                        return;
                     }
                     Thread.sleep(250);
                 }
 
-                if (!chunkReceived) {
-                    System.out.println("Chunk " + index + " not received. Retrying...");
-                    Thread.sleep(retryDelay);
-                }
+                System.out.println("Chunk " + index + " not received. Retrying...");
+                Thread.sleep(retryDelay);
             }
 
-            if (!chunkReceived) {
-                throw new RuntimeException("Failed to receive chunk " + index + " after " + maxRetries + " attempts.");
-            }
+            System.err.println("Failed to receive chunk " + index + " after " + maxRetries + " attempts.");
+
         } catch (IOException e) {
             throw new RuntimeException("IO error while requesting chunk " + index, e);
         } catch (InterruptedException e) {

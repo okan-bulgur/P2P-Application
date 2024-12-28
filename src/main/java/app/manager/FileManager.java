@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 public class FileManager {
-    final int CHUNK_SIZE = 500;
+    final int CHUNK_SIZE = 256 * 1024;
 
     private static FileManager instance;
     private File rootFolder;
@@ -39,7 +39,7 @@ public class FileManager {
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getUploadedFiles().get(filehash);
             file = new File(rootFolder, fileDTO.filename());
         }
-        else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) { //map of owned chunk
+        else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) {
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
             String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileDTO.filename();
             file = new File(fullPath);
@@ -80,11 +80,6 @@ public class FileManager {
         try {
             String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileHash + ".chunk_" + chunkIndex;
             File chunkFile  = new File(fullPath);
-            File parentDir = chunkFile.getParentFile();
-
-            if (!parentDir.exists() && !parentDir.mkdirs()) {
-                throw new IOException("Failed to create directories for path: " + parentDir.getAbsolutePath());
-            }
 
             try (FileOutputStream fos = new FileOutputStream(chunkFile)) {
                 fos.write(chunkData);
@@ -101,7 +96,7 @@ public class FileManager {
         } catch (IOException e) {
             System.err.println("Error saving chunk " + chunkIndex + ": " + e.getMessage());
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            System.err.println("Unexpected error saving chunk " + chunkIndex + ": " + e.getMessage());
         }
     }
 
@@ -228,23 +223,6 @@ public class FileManager {
         System.out.println("CHUNKS:\n" + NetworkManager.getInstance().getPeer().getOwnedChunks());
     }
 
-    private String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
-        byte[] chunkData = getChunkData(fileHash, chunkIndex);
-
-        File tempFile = File.createTempFile(fileHash, ".tmp");
-        tempFile.deleteOnExit();
-
-        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-            fos.write(chunkData);
-        }
-
-        String hash = getHash(tempFile);
-
-        tempFile.delete();
-
-        return hash;
-    }
-
     private String getFileName(File file) {
         return file.getName();
     }
@@ -278,13 +256,37 @@ public class FileManager {
             }
         }
 
-        byte[] hashBytes  = digest.digest();
+        byte[] hashBytes = digest.digest();
         StringBuilder hashString = new StringBuilder();
 
         for (byte b : hashBytes ) {
             hashString.append(String.format("%02x", b));
         }
         return hashString.toString();
+    }
+
+    public String getHashOfData(byte[] data) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashBytes = digest.digest(data);
+        StringBuilder hashString = new StringBuilder();
+
+        for (byte b : hashBytes) {
+            hashString.append(String.format("%02x", b));
+        }
+        return hashString.toString();
+    }
+
+    private String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
+        byte[] chunkData = getChunkData(fileHash, chunkIndex);
+        return getHashOfData(chunkData);
+    }
+
+    protected void generateChunkFolder() throws IOException {
+        String fullPath = destinationFolder + File.separator + CHUNK_FOLDER;
+        File dir = new File(fullPath);
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("Failed to create initial directories for path: " + dir.getAbsolutePath());
+        }
     }
 
     private PeerDTO getOwner() {

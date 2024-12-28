@@ -14,6 +14,7 @@ WORKDIR /app
 COPY target/P2P-Application-1.0-SNAPSHOT.jar /app/app.jar
 COPY src/main/java/app/res/CSE462TP.pdf /app/source/CSE462TP.pdf
 COPY src/main/java/app/res/CSE471TP.pdf /app/source/CSE471TP.pdf
+COPY src/main/java/app/res/tarkanMusic.mp3 /app/source/tarkanMusic.mp3
 RUN mkdir -p /app/dest
 
 ENV DISPLAY=host.docker.internal:0.0
