@@ -212,19 +212,4 @@ public class NetworkManager {
     public boolean isConnected() {
         return isUdpConnected;
     }
-
-    public void addManuelPeer(String ip, int port) {
-        PeerDTO newPeer = new PeerDTO(ip, port);
-        peer.addPeer(newPeer);
-
-        System.out.println("app.Peer added: " + newPeer.ip() + ":" + newPeer.port());
-    }
-
-    public void showPeers() {
-        System.out.println("\n\nPeers of " + peer);
-        for (PeerDTO p : peer.getPeers()) {
-            System.out.println(p);
-        }
-        System.out.println("\n\n");
-    }
 }

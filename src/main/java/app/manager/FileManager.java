@@ -8,18 +8,18 @@ import javax.swing.*;
 import java.io.*;
 import java.nio.file.*;
 import java.security.MessageDigest;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public class FileManager {
     final int CHUNK_SIZE = 256 * 1024;
 
     private static FileManager instance;
-    private File rootFolder;
+    public File rootFolder;
     private File destinationFolder;
     protected final String CHUNK_FOLDER = "chunks";
+
+    private List<File> prevSharedFiles;
 
     public static FileManager getInstance() {
         if(instance == null) {
@@ -30,9 +30,27 @@ public class FileManager {
 
     public List<File> listSharedFiles() {
         if(rootFolder == null || !rootFolder.exists()) return Collections.emptyList();
-        File[] files = rootFolder.listFiles();
-        if(files == null) return Collections.emptyList();
-        return Arrays.asList(files);
+
+        List<File> sharedFiles = new ArrayList<>();
+        findUnderFiles(rootFolder, sharedFiles);
+        return sharedFiles;
+    }
+
+    private void findUnderFiles(File folder, List<File> sharedFiles) {
+        File[] files = folder.listFiles();
+        if (files == null) return;
+
+        DefaultListModel<String> model = (DefaultListModel<String>) Screen.getInstance().excludeFoldersList.getModel();
+        List<String> excludeFolders = Collections.list(model.elements());
+
+        for (File file : files) {
+            if (file.isDirectory() && !Screen.getInstance().chkOnlyRoot.isSelected() && !excludeFolders.contains(file.getAbsolutePath())) {
+                findUnderFiles(file, sharedFiles);
+            }
+            else if (file.isFile()) {
+                sharedFiles.add(file);
+            }
+        }
     }
 
     public byte[] getChunkData(String filehash, int chunkIndex) throws IOException {
@@ -40,11 +58,15 @@ public class FileManager {
 
         if (NetworkManager.getInstance().getPeer().getUploadedFiles().containsKey(filehash)) {
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getUploadedFiles().get(filehash);
-            file = new File(rootFolder, fileDTO.filename());
+            file = new File(fileDTO.filePath());
+        }
+        else if (NetworkManager.getInstance().getPeer().getDownloadedFiles().containsKey(filehash)) {
+            FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
+            file = new File(destinationFolder, fileDTO.filename());
         }
         else if (NetworkManager.getInstance().getPeer().hasChunk(filehash, chunkIndex)) {
             FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
-            String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileDTO.filename();
+            String fullPath = destinationFolder + File.separator + CHUNK_FOLDER + File.separator + fileDTO.hash() + ".chunk_" + chunkIndex;
             file = new File(fullPath);
 
             byte[] chunkData = new byte[(int) file.length()];
@@ -54,10 +76,7 @@ public class FileManager {
             return chunkData;
 
         }
-        else if (NetworkManager.getInstance().getPeer().getDownloadedFiles().containsKey(filehash)) {
-            FileDTO fileDTO = NetworkManager.getInstance().getPeer().getFiles().get(filehash);
-            file = new File(destinationFolder, fileDTO.filename());
-        } else {
+        else {
             throw new IOException("File not found");
         }
 
@@ -65,7 +84,7 @@ public class FileManager {
         long chunkStart = (long) chunkIndex * CHUNK_SIZE;
 
         if (chunkStart >= fileLength) {
-            throw new IOException("Invalid chunk index: " + chunkIndex);
+            throw new IOException("Invalid chunk index: " + chunkIndex + " for file: " + file.getName() + " with length: " + fileLength);
         }
 
         int chunkSize = (int) Math.min(CHUNK_SIZE, fileLength - chunkStart);
@@ -213,7 +232,7 @@ public class FileManager {
 
         NetworkManager.getInstance().getBroadcastSocketHandler().sendFileNotification(message);
 
-        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
+        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner(), file.getPath());
         NetworkManager.getInstance().getPeer().addUploadedFiles(getHash(file), newFile);
 
         String[] chunks = new String[newFile.chunkCount()];
@@ -221,7 +240,7 @@ public class FileManager {
         NetworkManager.getInstance().getPeer().getOwnedChunks().put(newFile.hash(), chunks);
 
         for(int i=0; i < newFile.chunkCount(); i++) {
-            String chunkHash = getHashOfChunk(newFile.hash(), i);
+            String chunkHash = getHashOfChunk(file, newFile.hash(), i);
             NetworkManager.getInstance().getPeer().addOwnedChunk(newFile.hash(), chunkHash, i);
         }
 
@@ -281,7 +300,7 @@ public class FileManager {
         return hashString.toString();
     }
 
-    private String getHashOfChunk(String fileHash, int chunkIndex) throws Exception {
+    private String getHashOfChunk(File file, String fileHash, int chunkIndex) throws Exception {
         byte[] chunkData = getChunkData(fileHash, chunkIndex);
         return getHashOfData(chunkData);
     }
@@ -308,14 +327,28 @@ public class FileManager {
 
     public void setRootFolder(File root) {
         this.rootFolder = root;
+        DefaultListModel<String> model = (DefaultListModel<String>) Screen.getInstance().excludeFoldersList.getModel();
+        model.clear();
 
         try {
-            for (File file : listSharedFiles()) {
+            List<File> sharedFiles = listSharedFiles();
+            for (File file : sharedFiles) {
                 sendFileNotification(file, "ENTRY_CREATE");
                 if (isFileExclude(file)) {
                     sendFileNotification(file, "ENTRY_DELETE");
                 }
             }
+
+            if (prevSharedFiles != null) {
+                for (File file : prevSharedFiles) {
+                    if (!sharedFiles.contains(file)) {
+                        sendFileNotification(file, "ENTRY_DELETE");
+                    }
+                }
+            }
+
+            prevSharedFiles = sharedFiles;
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -337,7 +370,7 @@ public class FileManager {
                     System.out.println("File: " + file.getName());
 
                     try {
-                        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner());
+                        FileDTO newFile = new FileDTO(file.getName(), getFileType(file), file.length(), Integer.parseInt(getChunkCount(file)), getHash(file), getOwner(), file.getPath());
                         NetworkManager.getInstance().getPeer().addDownloadedFiles(getHash(file), newFile);
                     } catch (Exception e) {
                         throw new RuntimeException(e);
@@ -370,5 +403,27 @@ public class FileManager {
         }
 
         return false;
+    }
+
+    public void announceExcludeFolder(File folder, boolean isAdded) {
+        try {
+            List<File> underFiles = new ArrayList<>();
+            findUnderFiles(folder, underFiles);
+
+
+            if (isAdded) {
+                for (File file : underFiles) {
+                    sendFileNotification(file, "ENTRY_DELETE");
+                }
+            }
+            else {
+                for (File file : underFiles) {
+                    sendFileNotification(file, "ENTRY_CREATE");
+                }
+            }
+
+        }catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

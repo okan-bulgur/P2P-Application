@@ -2,7 +2,7 @@ package app.dto;
 
 import java.util.Objects;
 
-public record FileDTO(String filename, String fileType, long fileSize, int chunkCount, String hash, PeerDTO owner) {
+public record FileDTO(String filename, String fileType, long fileSize, int chunkCount, String hash, PeerDTO owner, String filePath) {
 
     public String toString() {
         double sizeInKB = fileSize / 1024.0;

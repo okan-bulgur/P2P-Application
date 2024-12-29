@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -125,8 +126,6 @@ public class UdpSocketHandler {
         int port = Integer.parseInt(parts[4].split("=")[1]);
         int ttl = Integer.parseInt(parts[5].split("=")[1]);
 
-        System.out.println(peer.getOwnedChunks());
-
         if (peer.hasChunk(fileHash, index)) {
             NetworkManager.getInstance().getTcpSocketHandler().sendChunk(fileHash, index, ip, NetworkManager.TCP_PORT);
         }
@@ -206,7 +205,7 @@ public class UdpSocketHandler {
             return;
         }
 
-        FileDTO file = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port));
+        FileDTO file = new FileDTO(filename, fileType, fileSize, chunkCount, hash, new PeerDTO(ip, port), null);
 
         peer.addFiles(hash, file);
     }

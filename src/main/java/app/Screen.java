@@ -4,7 +4,6 @@ import app.dto.FileDTO;
 import app.manager.DownloadManager;
 import app.manager.FileManager;
 import app.manager.NetworkManager;
-import app.socketHandler.BroadcastSocketHandler;
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,7 +11,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.regex.Pattern;
@@ -25,18 +23,10 @@ public class Screen extends JFrame {
     private JTextField txtRootFolder;
     private JTextField txtDestinationFolder;
 
-    private JButton btnSetRoot;
-    private JButton btnSetDestination;
-
-    private JCheckBox chkOnlyRoot;
-
     public JList<String> excludeFoldersList;
-    private JButton btnAddFolder;
-    private JButton btnDelFolder;
+    public JCheckBox chkOnlyRoot;
 
     public JList<String> excludeMasksList;
-    private JButton btnAddMask;
-    private JButton btnDelMask;
 
     protected DefaultListModel<FileDTO> downloadFilesModel;
     private JList<FileDTO> downloadingFilesList;
@@ -45,9 +35,8 @@ public class Screen extends JFrame {
     private JList<FileDTO> foundFilesList;
 
     private JTextField txtSearch;
-    private JButton btnSearch;
 
-    private GridBagConstraints gbc;
+    private final GridBagConstraints gbc;
 
     public static Screen getInstance() {
         if(instance == null) {
@@ -108,25 +97,6 @@ public class Screen extends JFrame {
         menuItemAbout.addActionListener(e -> {
             JOptionPane.showMessageDialog(this, "P2P File Sharing Application\n\nOkan Bulgur\n20200702017", "About", JOptionPane.INFORMATION_MESSAGE);
         });
-
-        JMenuItem addManuelPeer = new JMenuItem("Add Manuel app.Peer");
-        menuFiles.add(addManuelPeer);
-        addManuelPeer.addActionListener(e -> {
-            String ip = JOptionPane.showInputDialog("Enter IP Address:");
-            String port = JOptionPane.showInputDialog("Enter Port:");
-
-            if (ip == null || port == null) return;
-            if (ip.isEmpty() || port.isEmpty()) return;
-            if (!port.matches("\\d+")) return;
-            if (Integer.parseInt(port) < 0 || Integer.parseInt(port) > 65535) return;
-
-            NetworkManager.getInstance().addManuelPeer(ip, Integer.parseInt(port));
-        });
-
-        JMenuItem showPeers = new JMenuItem("Show Peers");
-        menuFiles.add(showPeers);
-        showPeers.addActionListener(e -> NetworkManager.getInstance().showPeers());
-
     }
 
     private void setupMainPanel(){
@@ -143,8 +113,6 @@ public class Screen extends JFrame {
 
     private void setupSharedFolderPanel(){
 
-        // Root of the P2P shared folder
-
         JPanel sharedFolderPanel = new JPanel(new GridBagLayout());
         sharedFolderPanel.setBorder(BorderFactory.createTitledBorder("Root of the P2P shared folder"));
 
@@ -152,7 +120,7 @@ public class Screen extends JFrame {
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 0.95; gbc.fill = GridBagConstraints.HORIZONTAL;
         sharedFolderPanel.add(txtRootFolder, gbc);
 
-        btnSetRoot = new JButton("Set");
+        JButton btnSetRoot = new JButton("Set");
         gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 0.05; gbc.fill = GridBagConstraints.NONE;
         sharedFolderPanel.add(btnSetRoot, gbc);
 
@@ -178,8 +146,6 @@ public class Screen extends JFrame {
     }
 
     private void setupDestinationFolderPanel(){
-        // Destination folder
-
         JPanel destFolderPanel = new JPanel(new GridBagLayout());
         destFolderPanel.setBorder(BorderFactory.createTitledBorder("Destination folder"));
 
@@ -187,7 +153,7 @@ public class Screen extends JFrame {
         gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1 ; gbc.weightx = 0.95; gbc.fill = GridBagConstraints.HORIZONTAL;
         destFolderPanel.add(txtDestinationFolder, gbc);
 
-        btnSetDestination = new JButton("Set");
+        JButton btnSetDestination = new JButton("Set");
         gbc.gridx = 1; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 0.05; gbc.fill = GridBagConstraints.NONE;
         destFolderPanel.add(btnSetDestination, gbc);
 
@@ -208,7 +174,6 @@ public class Screen extends JFrame {
     }
 
     private void setupSettingsPanel(){
-        // Settings
         JPanel settingsPanel = new JPanel(new GridBagLayout());
         settingsPanel.setBorder(BorderFactory.createTitledBorder("Settings"));
 
@@ -224,22 +189,20 @@ public class Screen extends JFrame {
     }
 
     private void setupFolderExclusionPanel(JPanel settingsPanel, GridBagConstraints sgbc){
-        // Folder exclusion
         JPanel exclusionPanel = new JPanel(new GridBagLayout());
         exclusionPanel.setBorder(BorderFactory.createTitledBorder("Folder exclusion"));
         chkOnlyRoot = new JCheckBox("Check new files only in the root", true);
         sgbc.gridx = 0; sgbc.gridy = 0; sgbc.gridwidth = 2; sgbc.weightx = 1.0; sgbc.fill = GridBagConstraints.HORIZONTAL;
         exclusionPanel.add(chkOnlyRoot, sgbc);
 
-        // Exclude files under these folders
         JPanel folderExclusionPanel = new JPanel(new BorderLayout());
         folderExclusionPanel.setBorder(BorderFactory.createTitledBorder("Exclude files under these folders"));
         excludeFoldersList = new JList<>(new DefaultListModel<>());
         folderExclusionPanel.add(new JScrollPane(excludeFoldersList), BorderLayout.CENTER);
 
         JPanel folderButtonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        btnAddFolder = new JButton("Add");
-        btnDelFolder = new JButton("Del");
+        JButton btnAddFolder = new JButton("Add");
+        JButton btnDelFolder = new JButton("Del");
         folderButtonPanel.add(btnAddFolder);
         folderButtonPanel.add(btnDelFolder);
         folderExclusionPanel.add(folderButtonPanel, BorderLayout.SOUTH);
@@ -248,6 +211,45 @@ public class Screen extends JFrame {
 
         exclusionPanel.add(folderExclusionPanel, sgbc);
         settingsPanel.add(exclusionPanel, sgbc);
+
+        excludeFoldersList.setEnabled(false);
+        btnAddFolder.setEnabled(false);
+        btnDelFolder.setEnabled(false);
+
+        chkOnlyRoot.addActionListener(e -> {
+            File rootFolder = FileManager.getInstance().getRootFolder();
+            FileManager.getInstance().setRootFolder(rootFolder);
+            if (chkOnlyRoot.isSelected()) {
+                excludeFoldersList.setEnabled(false);
+                btnAddFolder.setEnabled(false);
+                btnDelFolder.setEnabled(false);
+            } else {
+                excludeFoldersList.setEnabled(true);
+                btnAddFolder.setEnabled(true);
+                btnDelFolder.setEnabled(true);
+            }
+        });
+
+        btnAddFolder.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fileChooser.setAcceptAllFileFilterUsed(false);
+
+            if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                DefaultListModel<String> model = (DefaultListModel<String>) excludeFoldersList.getModel();
+                model.addElement(fileChooser.getSelectedFile().getAbsolutePath());
+                FileManager.getInstance().announceExcludeFolder(fileChooser.getSelectedFile(), true);
+            }
+        });
+
+        btnDelFolder.addActionListener(e -> {
+            DefaultListModel<String> model = (DefaultListModel<String>) excludeFoldersList.getModel();
+            int index = excludeFoldersList.getSelectedIndex();
+            if (index != -1) {
+                FileManager.getInstance().announceExcludeFolder(new File(model.get(index)), false);
+                model.remove(index);
+            }
+        });
     }
 
     private void setupMaskExclusionPanel(JPanel settingsPanel, GridBagConstraints sgbc){
@@ -257,8 +259,8 @@ public class Screen extends JFrame {
         maskPanel.add(new JScrollPane(excludeMasksList), BorderLayout.CENTER);
 
         JPanel maskInputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
-        btnAddMask = new JButton("Add");
-        btnDelMask = new JButton("Del");
+        JButton btnAddMask = new JButton("Add");
+        JButton btnDelMask = new JButton("Del");
         maskInputPanel.add(btnAddMask);
         maskInputPanel.add(btnDelMask);
         maskPanel.add(maskInputPanel, BorderLayout.SOUTH);
@@ -340,7 +342,6 @@ public class Screen extends JFrame {
 
         startMonitoringPeerFiles();
         selectFileToDownload();
-        // Search
         setupSearchPanel(foundPanel);
 
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 3; gbc.weightx = 1.0; gbc.weighty = 0.3; gbc.fill = GridBagConstraints.BOTH;
@@ -358,7 +359,7 @@ public class Screen extends JFrame {
         sgbc.gridx = 0; sgbc.gridy = 0; sgbc.gridwidth = 1 ; sgbc.weightx = 0.95; sgbc.fill = GridBagConstraints.HORIZONTAL;
         searchPanel.add(txtSearch, sgbc);
 
-        btnSearch = new JButton("Search");
+        JButton btnSearch = new JButton("Search");
         sgbc.gridx = 1; sgbc.gridy = 0; sgbc.gridwidth = 1; sgbc.weightx = 0.05; sgbc.fill = GridBagConstraints.HORIZONTAL;
         searchPanel.add(btnSearch, sgbc);
 
